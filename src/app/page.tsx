@@ -1,12 +1,32 @@
 import React from "react";
+import Navbar from "@/components/Landing/Navbar";
+import Hero from "@/components/Landing/Hero";
+import CodeEditorMockup from "@/components/Landing/CodeEditorMockup";
+import ProductShowcase from "@/components/Landing/ProductShowcase";
+import AIAgent from "@/components/Landing/AIAgent";
+import Languages from "@/components/Landing/Languages";
+import HowItWorks from "@/components/Landing/HowItWorks";
+import Pricing from "@/components/Landing/Pricing";
+import FAQ from "@/components/Landing/FAQ";
+import FinalCTA from "@/components/Landing/FinalCTA";
+import Footer from "@/components/Landing/Footer";
 
-function HomePage() {
+export default function HomePage() {
   return (
-    <div>
-      <h1>Welcome to the HomePage</h1>
+    <div className="min-h-screen bg-white text-[#171717] selection:bg-[#F3F0FF] selection:text-[#6C5CE7] flex flex-col font-sans">
+      <Navbar />
+      <main className="flex-1">
+        <Hero />
+        <CodeEditorMockup />
+        <ProductShowcase />
+        <AIAgent />
+        <Languages />
+        <HowItWorks />
+        <Pricing />
+        <FAQ />
+        <FinalCTA />
+      </main>
+      <Footer />
     </div>
   );
 }
-
-export default HomePage;
- 
