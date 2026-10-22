@@ -4,42 +4,42 @@ import { Code2, ExternalLink } from "lucide-react";
 
 export default function Footer() {
   return (
-    <footer className="bg-white border-t border-[#EAEAEA] text-[#666666] text-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+    <footer className="bg-[var(--color-surface)] border-t border-[var(--color-border)] landing-muted text-sm">
+      <div className="landing-container py-12 sm:py-16">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8 lg:gap-12">
           {/* Brand Info Column */}
           <div className="col-span-2 space-y-4">
             <Link
               href="/"
-              className="flex items-center gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C5CE7] rounded-lg w-fit"
+              className="flex items-center gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] rounded-[var(--radius-md)] w-fit"
             >
-              <div className="w-7 h-7 rounded-lg bg-[#6C5CE7] flex items-center justify-center text-white">
+              <div className="w-7 h-7 rounded-[var(--radius-sm)] bg-[var(--color-primary)] flex items-center justify-center text-white">
                 <Code2 className="w-4 h-4 stroke-[2.5]" />
               </div>
-              <span className="text-lg font-bold tracking-tight text-[#171717]">
+              <span className="text-lg font-bold tracking-tight text-[var(--color-foreground)]">
                 Code Editor
               </span>
             </Link>
-            <p className="text-xs sm:text-sm text-[#666666] max-w-sm leading-relaxed">
+            <p className="text-xs sm:text-sm landing-muted max-w-sm leading-relaxed">
               An intelligent, browser-based coding workspace designed for modern
               developers. Write, explore, and ship projects with AI assistance.
             </p>
-            <div className="pt-2 flex items-center gap-2 text-xs text-neutral-500">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+            <div className="pt-2 flex items-center gap-2 text-xs landing-muted">
+              <span className="w-2 h-2 rounded-full bg-[var(--color-success)] inline-block" />
               <span>All systems operational</span>
             </div>
           </div>
 
           {/* Links Column 1: Product */}
           <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-[#171717] mb-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--color-foreground)] mb-3">
               Product
             </h4>
             <ul className="space-y-2 text-xs sm:text-sm">
               <li>
                 <a
                   href="#editor-demo"
-                  className="hover:text-[#171717] transition-colors"
+                  className="hover:text-[var(--color-foreground)] transition-colors"
                 >
                   Code Editor
                 </a>
@@ -47,7 +47,7 @@ export default function Footer() {
               <li>
                 <a
                   href="#ai-agent"
-                  className="hover:text-[#171717] transition-colors"
+                  className="hover:text-[var(--color-foreground)] transition-colors"
                 >
                   AI Assistant
                 </a>
@@ -55,7 +55,7 @@ export default function Footer() {
               <li>
                 <a
                   href="#languages"
-                  className="hover:text-[#171717] transition-colors"
+                  className="hover:text-[var(--color-foreground)] transition-colors"
                 >
                   Supported Languages
                 </a>
@@ -63,7 +63,7 @@ export default function Footer() {
               <li>
                 <a
                   href="#pricing"
-                  className="hover:text-[#171717] transition-colors"
+                  className="hover:text-[var(--color-foreground)] transition-colors"
                 >
                   Pricing
                 </a>
@@ -73,14 +73,14 @@ export default function Footer() {
 
           {/* Links Column 2: Features & Docs */}
           <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-[#171717] mb-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--color-foreground)] mb-3">
               Features
             </h4>
             <ul className="space-y-2 text-xs sm:text-sm">
               <li>
                 <a
                   href="#features"
-                  className="hover:text-[#171717] transition-colors"
+                  className="hover:text-[var(--color-foreground)] transition-colors"
                 >
                   Multi-file Editing
                 </a>
@@ -88,7 +88,7 @@ export default function Footer() {
               <li>
                 <a
                   href="#features"
-                  className="hover:text-[#171717] transition-colors"
+                  className="hover:text-[var(--color-foreground)] transition-colors"
                 >
                   Live Preview
                 </a>
@@ -96,7 +96,7 @@ export default function Footer() {
               <li>
                 <a
                   href="#how-it-works"
-                  className="hover:text-[#171717] transition-colors"
+                  className="hover:text-[var(--color-foreground)] transition-colors"
                 >
                   How It Works
                 </a>
@@ -104,7 +104,7 @@ export default function Footer() {
               <li>
                 <a
                   href="#faq"
-                  className="hover:text-[#171717] transition-colors"
+                  className="hover:text-[var(--color-foreground)] transition-colors"
                 >
                   Documentation
                 </a>
@@ -114,7 +114,7 @@ export default function Footer() {
 
           {/* Links Column 3: Legal & GitHub */}
           <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-[#171717] mb-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--color-foreground)] mb-3">
               Community & Legal
             </h4>
             <ul className="space-y-2 text-xs sm:text-sm">
@@ -123,7 +123,7 @@ export default function Footer() {
                   href="https://github.com"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 hover:text-[#171717] transition-colors"
+                  className="inline-flex items-center gap-1.5 hover:text-[var(--color-foreground)] transition-colors"
                 >
                   <span>GitHub</span>
                   <ExternalLink className="w-3 h-3 text-neutral-400" />
@@ -132,7 +132,7 @@ export default function Footer() {
               <li>
                 <a
                   href="#faq"
-                  className="hover:text-[#171717] transition-colors"
+                  className="hover:text-[var(--color-foreground)] transition-colors"
                 >
                   Privacy Policy
                 </a>
@@ -140,7 +140,7 @@ export default function Footer() {
               <li>
                 <a
                   href="#faq"
-                  className="hover:text-[#171717] transition-colors"
+                  className="hover:text-[var(--color-foreground)] transition-colors"
                 >
                   Terms of Service
                 </a>
@@ -148,7 +148,7 @@ export default function Footer() {
               <li>
                 <a
                   href="#faq"
-                  className="hover:text-[#171717] transition-colors"
+                  className="hover:text-[var(--color-foreground)] transition-colors"
                 >
                   FAQ
                 </a>
@@ -158,7 +158,7 @@ export default function Footer() {
         </div>
 
         {/* Bottom Bar */}
-        <div className="mt-12 pt-8 border-t border-[#EAEAEA] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#666666]">
+        <div className="mt-12 pt-8 border-t border-[var(--color-border)] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs landing-muted">
           <p>© 2026 Code Editor. All rights reserved.</p>
           <p className="flex items-center gap-1">
             Built for developers with modern web standards.

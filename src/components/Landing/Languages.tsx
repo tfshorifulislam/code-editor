@@ -79,18 +79,18 @@ export default function Languages() {
   ];
 
   return (
-    <section id="languages" className="py-20 sm:py-32 bg-white relative">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="languages" className="landing-section bg-[var(--color-surface)]">
+      <div className="landing-container">
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-14 sm:mb-20">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-[#F3F0FF] text-[#6C5CE7] border border-[#6C5CE7]/20 mb-4">
+          <div className="landing-eyebrow mb-4">
             <Code2 className="w-3.5 h-3.5" />
             <span>Supported Languages</span>
           </div>
-          <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-[#171717]">
+          <h2 className="landing-section-title">
             Your language. Your workflow.
           </h2>
-          <p className="mt-4 text-base sm:text-lg text-[#666666] leading-relaxed">
+          <p className="landing-paragraph mt-4">
             Engineered with dedicated syntax parsers, intelligent code folding,
             and formatting for the languages you build with every day.
           </p>
@@ -101,40 +101,40 @@ export default function Languages() {
           {languages.map((lang) => (
             <div
               key={lang.name}
-              className="group p-5 sm:p-6 rounded-2xl border border-[#EAEAEA] bg-white hover:border-[#6C5CE7]/40 hover:shadow-lg transition-all duration-200 flex flex-col justify-between"
+              className="group landing-card p-5 sm:p-6 hover:border-[var(--color-primary)]/40 hover:shadow-lg transition-all duration-200 flex flex-col justify-between"
             >
               <div>
                 {/* Top Badge & Extension */}
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2.5">
                     <span
-                      className="w-3.5 h-3.5 rounded-full inline-block shadow-xs"
+                      className="w-3.5 h-3.5 rounded-full inline-block shadow-2xs"
                       style={{ backgroundColor: lang.color }}
                       aria-hidden="true"
                     />
-                    <h3 className="text-base font-bold text-[#171717] group-hover:text-[#6C5CE7] transition-colors">
+                    <h3 className="text-base font-bold text-[var(--color-foreground)] group-hover:text-[var(--color-primary)] transition-colors">
                       {lang.name}
                     </h3>
                   </div>
-                  <span className="text-xs font-mono px-2 py-0.5 rounded bg-neutral-100 text-neutral-600 font-medium">
+                  <span className="text-xs font-mono px-2 py-0.5 rounded-[var(--radius-sm)] bg-neutral-100 text-neutral-600 font-medium">
                     {lang.extension}
                   </span>
                 </div>
 
                 {/* Description */}
-                <p className="text-xs sm:text-sm text-[#666666] leading-relaxed mb-4">
+                <p className="text-xs sm:text-sm landing-muted leading-relaxed mb-4">
                   {lang.description}
                 </p>
               </div>
 
               {/* Feature Pills */}
-              <div className="pt-3 border-t border-[#EAEAEA] flex flex-wrap gap-1.5">
+              <div className="pt-3 border-t border-[var(--color-border)] flex flex-wrap gap-1.5">
                 {lang.features.map((feat, idx) => (
                   <span
                     key={idx}
-                    className="inline-flex items-center gap-1 text-[10px] font-mono text-neutral-600 bg-neutral-50 px-2 py-0.5 rounded border border-neutral-200/60"
+                    className="inline-flex items-center gap-1 text-[10px] font-mono text-neutral-600 bg-neutral-50 px-2 py-0.5 rounded-[var(--radius-sm)] border border-[var(--color-border)]"
                   >
-                    <Check className="w-2.5 h-2.5 text-[#6C5CE7]" />
+                    <Check className="w-2.5 h-2.5 text-[var(--color-primary)]" />
                     <span>{feat}</span>
                   </span>
                 ))}
@@ -144,7 +144,7 @@ export default function Languages() {
         </div>
 
         {/* Technical Transparency Note */}
-        <div className="mt-12 text-center text-xs text-[#666666] max-w-2xl mx-auto">
+        <div className="mt-12 text-center text-xs landing-muted max-w-2xl mx-auto">
           Language syntax highlighting, bracket matching, and editor tooling are
           provided in-browser. Web projects (HTML, CSS, JavaScript, TypeScript)
           support live client-side preview execution.

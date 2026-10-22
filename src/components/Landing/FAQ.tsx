@@ -44,18 +44,18 @@ export default function FAQ() {
   };
 
   return (
-    <section id="faq" className="py-20 sm:py-32 bg-neutral-50/50 border-t border-[#EAEAEA] relative">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="faq" className="landing-section bg-[var(--color-surface-hover)] border-t border-[var(--color-border)]">
+      <div className="landing-container max-w-4xl">
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-14 sm:mb-20">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-white text-[#6C5CE7] border border-[#6C5CE7]/20 shadow-xs mb-4">
+          <div className="landing-eyebrow mb-4 bg-white">
             <HelpCircle className="w-3.5 h-3.5" />
             <span>Got Questions?</span>
           </div>
-          <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-[#171717]">
+          <h2 className="landing-section-title">
             Frequently Asked Questions
           </h2>
-          <p className="mt-4 text-base sm:text-lg text-[#666666] leading-relaxed">
+          <p className="landing-paragraph mt-4">
             Honest answers about the capabilities, supported languages, and
             features of our browser-based editor.
           </p>
@@ -68,7 +68,7 @@ export default function FAQ() {
             return (
               <div
                 key={idx}
-                className="bg-white rounded-2xl border border-[#EAEAEA] shadow-2xs overflow-hidden transition-colors"
+                className="landing-card overflow-hidden transition-colors"
               >
                 <button
                   type="button"
@@ -76,14 +76,14 @@ export default function FAQ() {
                   aria-expanded={isOpen}
                   aria-controls={`faq-answer-${idx}`}
                   onClick={() => toggleFAQ(idx)}
-                  className="w-full px-6 py-5 text-left flex items-center justify-between gap-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C5CE7] hover:bg-neutral-50/70 transition-colors"
+                  className="w-full px-6 py-5 text-left flex items-center justify-between gap-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
                 >
-                  <span className="text-base sm:text-lg font-semibold text-[#171717]">
+                  <span className="landing-card-title text-base sm:text-lg">
                     {faq.question}
                   </span>
                   <div
                     className={`w-7 h-7 rounded-full bg-neutral-100 flex items-center justify-center shrink-0 transition-transform duration-200 ${
-                      isOpen ? "rotate-180 bg-[#F3F0FF] text-[#6C5CE7]" : "text-[#666666]"
+                      isOpen ? "rotate-180 bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "landing-muted"
                     }`}
                   >
                     <ChevronDown className="w-4 h-4 stroke-[2.5]" />
@@ -95,7 +95,7 @@ export default function FAQ() {
                     id={`faq-answer-${idx}`}
                     role="region"
                     aria-labelledby={`faq-btn-${idx}`}
-                    className="px-6 pb-6 pt-1 text-sm sm:text-base text-[#666666] leading-relaxed border-t border-[#EAEAEA]/50 animate-in fade-in-50 duration-150"
+                    className="px-6 pb-6 pt-1 landing-paragraph text-sm sm:text-base border-t border-[var(--color-border)]/50 animate-in fade-in-50 duration-150"
                   >
                     {faq.answer}
                   </div>
@@ -108,4 +108,3 @@ export default function FAQ() {
     </section>
   );
 }
-

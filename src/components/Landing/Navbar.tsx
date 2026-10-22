@@ -22,17 +22,17 @@ export default function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-sm border-b border-[#EAEAEA] transition-colors">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <header className="sticky top-0 z-50 w-full bg-[var(--color-surface)]/95 backdrop-blur-sm border-b border-[var(--color-border)] transition-colors">
+      <div className="landing-container h-16 flex items-center justify-between">
         {/* Brand Logo */}
         <Link
           href="/"
-          className="flex items-center gap-2.5 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C5CE7] rounded-lg"
+          className="flex items-center gap-2.5 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] rounded-[var(--radius-md)]"
         >
-          <div className="w-8 h-8 rounded-lg bg-[#6C5CE7] flex items-center justify-center text-white shadow-sm transition-transform group-hover:scale-105">
+          <div className="w-8 h-8 rounded-[var(--radius-md)] bg-[var(--color-primary)] flex items-center justify-center text-white shadow-xs transition-transform group-hover:scale-105">
             <Code2 className="w-4 h-4 stroke-[2.5]" />
           </div>
-          <span className="text-lg font-bold tracking-tight text-[#171717]">
+          <span className="text-lg font-bold tracking-tight text-[var(--color-foreground)]">
             Code Editor
           </span>
         </Link>
@@ -43,7 +43,7 @@ export default function Navbar() {
             <a
               key={link.name}
               href={link.href}
-              className="text-sm font-medium text-[#666666] hover:text-[#171717] px-3 py-1.5 rounded-md hover:bg-neutral-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C5CE7]"
+              className="text-sm font-medium landing-muted hover:text-[var(--color-foreground)] px-3 py-1.5 rounded-[var(--radius-md)] hover:bg-[var(--color-surface-hover)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
             >
               {link.name}
             </a>
@@ -54,13 +54,13 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-3">
           <a
             href="#editor-demo"
-            className="text-sm font-medium text-[#666666] hover:text-[#171717] px-3 py-2 rounded-md hover:bg-neutral-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C5CE7]"
+            className="text-sm font-medium landing-muted hover:text-[var(--color-foreground)] px-3 py-2 rounded-[var(--radius-md)] hover:bg-[var(--color-surface-hover)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
           >
             Sign In
           </a>
           <a
             href="#editor-demo"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-white bg-[#6C5CE7] hover:bg-[#5b4cc4] px-4 py-2 rounded-lg shadow-sm hover:shadow transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C5CE7] focus-visible:ring-offset-2"
+            className="landing-button-primary !py-2 !px-4 text-xs sm:text-sm"
           >
             <span>Start Coding Free</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -72,7 +72,7 @@ export default function Navbar() {
           <button
             type="button"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 rounded-lg text-[#666666] hover:text-[#171717] hover:bg-neutral-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6C5CE7]"
+            className="p-2 rounded-[var(--radius-md)] landing-muted hover:text-[var(--color-foreground)] hover:bg-[var(--color-surface-hover)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
             aria-expanded={mobileMenuOpen}
             aria-label="Toggle navigation menu"
           >
@@ -87,31 +87,31 @@ export default function Navbar() {
 
       {/* Mobile menu dropdown */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-b border-[#EAEAEA] bg-white px-4 pt-2 pb-6 space-y-3 shadow-lg animate-in slide-in-from-top-2 duration-200">
+        <div className="md:hidden border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 pt-2 pb-6 space-y-3 shadow-lg animate-in slide-in-from-top-2 duration-200">
           <div className="flex flex-col space-y-1">
             {navLinks.map((link) => (
               <a
                 key={link.name}
                 href={link.href}
                 onClick={handleLinkClick}
-                className="text-sm font-medium text-[#666666] hover:text-[#171717] px-3 py-2.5 rounded-lg hover:bg-neutral-50 transition-colors"
+                className="text-sm font-medium landing-muted hover:text-[var(--color-foreground)] px-3 py-2.5 rounded-[var(--radius-md)] hover:bg-[var(--color-surface-hover)] transition-colors"
               >
                 {link.name}
               </a>
             ))}
           </div>
-          <div className="pt-4 border-t border-[#EAEAEA] flex flex-col gap-2">
+          <div className="pt-4 border-t border-[var(--color-border)] flex flex-col gap-2">
             <a
               href="#editor-demo"
               onClick={handleLinkClick}
-              className="w-full text-center text-sm font-medium text-[#666666] hover:text-[#171717] py-2.5 rounded-lg border border-[#EAEAEA] hover:bg-neutral-50 transition-colors"
+              className="w-full text-center text-sm font-medium landing-muted hover:text-[var(--color-foreground)] py-2.5 rounded-[var(--radius-md)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-colors"
             >
               Sign In
             </a>
             <a
               href="#editor-demo"
               onClick={handleLinkClick}
-              className="w-full text-center text-sm font-medium text-white bg-[#6C5CE7] hover:bg-[#5b4cc4] py-2.5 rounded-lg shadow-sm transition-all"
+              className="w-full text-center landing-button-primary !py-2.5"
             >
               Start Coding Free
             </a>
@@ -121,4 +121,3 @@ export default function Navbar() {
     </header>
   );
 }
-

@@ -13,7 +13,7 @@ import Footer from "@/components/Landing/Footer";
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-white text-[#171717] selection:bg-[#F3F0FF] selection:text-[#6C5CE7] flex flex-col font-sans">
+    <div className="landing-page selection:bg-[var(--color-accent-soft)] selection:text-[var(--color-accent)]">
       <Navbar />
       <main className="flex-1">
         <Hero />
