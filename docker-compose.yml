@@ -1,0 +1,68 @@
+version: "3.8"
+
+services:
+  # 1. PostgreSQL 16 Database for Multi-User Persistence
+  postgres:
+    image: postgres:16-alpine
+    container_name: code-editor-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: editor_user
+      POSTGRES_PASSWORD: editor_secure_password_99
+      POSTGRES_DB: code_editor
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U editor_user -d code_editor"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. Next.js Control Plane & Figma-Inspired Dashboard
+  control-plane:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: code-editor-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: "postgresql://editor_user:editor_secure_password_99@postgres:5432/code_editor?schema=public"
+      JWT_SECRET: "code-editor-ultra-secure-jwt-secret-key-32-chars-min-prod-key-99"
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    volumes:
+      - workspace_data:/workspaces
+
+  # 3. OpenVSCode Server Workspace Base Template (Gitpod Upstream)
+  workspace-template:
+    image: gitpod/openvscode-server:latest
+    container_name: code-editor-workspace-base
+    restart: unless-stopped
+    environment:
+      OPENVSCODE_SERVER_ROOT: /home/workspace
+    ports:
+      - "30000:3000"
+    volumes:
+      - workspace_data:/home/workspace
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4096M
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+volumes:
+  postgres_data:
+    driver: local
+  workspace_data:
+    driver: local
+

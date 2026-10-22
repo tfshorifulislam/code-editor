@@ -79,6 +79,30 @@ export default function ProjectCard({
           badgeBg: "bg-emerald-50 text-emerald-700 border-emerald-200",
           accentColor: "#10b981",
         };
+      case "python":
+        return {
+          label: "Python 3",
+          badgeBg: "bg-blue-50 text-blue-700 border-blue-200",
+          accentColor: "#3b82f6",
+        };
+      case "cpp":
+        return {
+          label: "C++ 20",
+          badgeBg: "bg-indigo-50 text-indigo-700 border-indigo-200",
+          accentColor: "#6366f1",
+        };
+      case "go":
+        return {
+          label: "Go",
+          badgeBg: "bg-sky-50 text-sky-700 border-sky-200",
+          accentColor: "#0ea5e9",
+        };
+      case "rust":
+        return {
+          label: "Rust",
+          badgeBg: "bg-orange-50 text-orange-700 border-orange-200",
+          accentColor: "#f97316",
+        };
       case "blank":
       default:
         return {

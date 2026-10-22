@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { GitBranch, Sparkles, Check } from "lucide-react";
+import { GitBranch, Sparkles, Check, Cloud, Loader2, AlertCircle } from "lucide-react";
 import { ProjectFile } from "@/types/editor";
 
 interface StatusBarProps {
@@ -9,6 +9,7 @@ interface StatusBarProps {
   cursorPos: { line: number; column: number };
   onToggleTerminal: () => void;
   isTerminalOpen: boolean;
+  saveStatus?: "saved" | "saving" | "unsaved" | "error";
 }
 
 export default function StatusBar({
@@ -16,6 +17,7 @@ export default function StatusBar({
   cursorPos,
   onToggleTerminal,
   isTerminalOpen,
+  saveStatus = "saved",
 }: StatusBarProps) {
   const getLanguageLabel = (file: ProjectFile | null): string => {
     if (!file) return "Plain Text";
@@ -66,7 +68,32 @@ export default function StatusBar({
         </button>
 
         <span className="hidden sm:inline text-white/50">•</span>
-        <span className="hidden sm:inline text-white/80">Code Editor v1.0</span>
+        <div className="flex items-center gap-1">
+          {saveStatus === "saving" && (
+            <span className="flex items-center gap-1 text-amber-200">
+              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+              <span>Saving...</span>
+            </span>
+          )}
+          {saveStatus === "unsaved" && (
+            <span className="flex items-center gap-1 text-amber-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-300" />
+              <span>Unsaved</span>
+            </span>
+          )}
+          {saveStatus === "saved" && (
+            <span className="flex items-center gap-1 text-white/85">
+              <Cloud className="w-2.5 h-2.5" />
+              <span>Cloud Saved</span>
+            </span>
+          )}
+          {saveStatus === "error" && (
+            <span className="flex items-center gap-1 text-rose-200">
+              <AlertCircle className="w-2.5 h-2.5" />
+              <span>Save Error</span>
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Right Section */}

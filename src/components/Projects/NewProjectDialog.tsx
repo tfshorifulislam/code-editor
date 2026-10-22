@@ -11,9 +11,10 @@ import {
   Layers,
   Server,
   FilePlus2,
+  Loader2,
 } from "lucide-react";
 import { ProjectTemplate } from "@/types/editor";
-import { createStarterProject, saveProjects, loadProjects, saveActiveProjectId } from "@/lib/storage/projectStorage";
+import { cloudApi } from "@/lib/cloud/cloudApi";
 
 interface NewProjectDialogProps {
   isOpen: boolean;
@@ -29,6 +30,8 @@ export default function NewProjectDialog({
   const router = useRouter();
   const [projectName, setProjectName] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState<ProjectTemplate>("react-ts");
+  const [isCreating, setIsCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -68,6 +71,34 @@ export default function NewProjectDialog({
       color: "border-emerald-500/40 bg-emerald-500/5",
     },
     {
+      id: "python",
+      title: "Python 3 Service",
+      description: "Python data scripts, virtual environment, and FastAPI service endpoints.",
+      icon: <FileCode className="w-5 h-5 text-blue-500" />,
+      color: "border-blue-500/40 bg-blue-500/5",
+    },
+    {
+      id: "cpp",
+      title: "C++ Systems Application",
+      description: "Native C++20 systems programming with Makefile and high-performance algorithms.",
+      icon: <Layers className="w-5 h-5 text-indigo-500" />,
+      color: "border-indigo-500/40 bg-indigo-500/5",
+    },
+    {
+      id: "go",
+      title: "Go Cloud Microservice",
+      description: "Fast concurrent HTTP service with go.mod dependency tooling and standard library.",
+      icon: <Globe className="w-5 h-5 text-sky-500" />,
+      color: "border-sky-500/40 bg-sky-500/5",
+    },
+    {
+      id: "rust",
+      title: "Rust Systems Project",
+      description: "Memory-safe systems programming with Cargo manifest and modern toolchain.",
+      icon: <Server className="w-5 h-5 text-orange-500" />,
+      color: "border-orange-500/40 bg-orange-500/5",
+    },
+    {
       id: "blank",
       title: "Blank Project",
       description: "Empty canvas with index file and markdown documentation ready for customization.",
@@ -76,21 +107,25 @@ export default function NewProjectDialog({
     },
   ];
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const finalName = projectName.trim() || undefined;
-    const newProject = createStarterProject(selectedTemplate, finalName);
+    setIsCreating(true);
+    setError(null);
+    try {
+      const finalName = projectName.trim() || undefined;
+      const newProject = await cloudApi.projects.create(selectedTemplate, finalName);
 
-    const existing = loadProjects();
-    const updated = [newProject, ...existing];
-    saveProjects(updated);
-    saveActiveProjectId(newProject.id);
-
-    onClose();
-    if (onCreated) {
-      onCreated(newProject.id);
-    } else {
-      router.push(`/editor/${newProject.id}`);
+      onClose();
+      if (onCreated) {
+        onCreated(newProject.id);
+      } else {
+        router.push(`/editor/${newProject.id}`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to create project.";
+      setError(msg);
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -183,21 +218,38 @@ export default function NewProjectDialog({
             </div>
           </div>
 
+          {error && (
+            <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 px-3 py-2 rounded-lg">
+              {error}
+            </p>
+          )}
+
           {/* Footer Actions */}
           <div className="pt-3 border-t border-[#f0f0f0] flex items-center justify-end gap-2.5">
             <button
               type="button"
               onClick={onClose}
+              disabled={isCreating}
               className="px-4 py-2 rounded-xl text-xs font-semibold text-neutral-600 hover:bg-neutral-100 transition cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white text-xs font-bold shadow-xs hover:shadow transition cursor-pointer flex items-center gap-1.5"
+              disabled={isCreating}
+              className="px-5 py-2 rounded-xl bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] disabled:opacity-60 text-white text-xs font-bold shadow-xs hover:shadow transition cursor-pointer flex items-center gap-1.5"
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Create & Open Project</span>
+              {isCreating ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Creating in Cloud...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Create & Open Project</span>
+                </>
+              )}
             </button>
           </div>
         </form>

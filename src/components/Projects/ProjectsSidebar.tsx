@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import {
   Code2,
@@ -13,7 +13,10 @@ import {
   Settings,
   User,
   ArrowLeft,
+  LogOut,
+  Cloud,
 } from "lucide-react";
+import { useAuth } from "@/components/Auth/AuthContext";
 
 export type DashboardViewCategory =
   | "all"
@@ -40,6 +43,8 @@ export default function ProjectsSidebar({
   onOpenNewProject,
   counts,
 }: ProjectsSidebarProps) {
+  const { user, logout } = useAuth();
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const navItems = [
     {
       id: "all" as DashboardViewCategory,
@@ -149,23 +154,62 @@ export default function ProjectsSidebar({
       </div>
 
       {/* Bottom User Profile Section */}
-      <div className="p-3 border-t border-[#eaeaea] bg-white">
-        <div className="flex items-center justify-between p-2 rounded-lg hover:bg-neutral-50 transition cursor-pointer">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-xs">
-              <User className="w-4 h-4" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs font-semibold text-neutral-900 truncate">
-                Developer Workspace
+      <div className="p-3 border-t border-[#eaeaea] bg-white relative">
+        {user ? (
+          <div>
+            <div
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              className="flex items-center justify-between p-2 rounded-xl hover:bg-neutral-50 transition cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[var(--color-primary)] to-indigo-600 flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-xs">
+                  {user.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold text-neutral-900 truncate">
+                    {user.name}
+                  </div>
+                  <div className="text-[10px] text-neutral-400 font-mono truncate flex items-center gap-1">
+                    <Cloud className="w-2.5 h-2.5 text-emerald-500" />
+                    <span>Cloud Connected</span>
+                  </div>
+                </div>
               </div>
-              <div className="text-[10px] text-neutral-400 font-mono">
-                Local-first • Free Tier
-              </div>
+              <Settings className="w-4 h-4 text-neutral-400 hover:text-neutral-700 shrink-0" />
             </div>
+
+            {/* User Popup Dropdown */}
+            {showUserMenu && (
+              <div className="absolute left-3 right-3 bottom-16 bg-white border border-[#eaeaea] rounded-2xl shadow-xl p-2 text-xs space-y-1 animate-in fade-in zoom-in-95 duration-100 z-50">
+                <div className="px-3 py-2 border-b border-[#f0f0f0] mb-1">
+                  <p className="font-semibold text-neutral-900 truncate">{user.name}</p>
+                  <p className="text-[11px] text-neutral-400 truncate">{user.email}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setShowUserMenu(false);
+                    await logout();
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-rose-50 text-rose-600 text-left cursor-pointer transition font-medium"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            )}
           </div>
-          <Settings className="w-4 h-4 text-neutral-400 hover:text-neutral-700 shrink-0" />
-        </div>
+        ) : (
+          <div className="p-1">
+            <Link
+              href="/login"
+              className="w-full flex items-center justify-center gap-1.5 py-2 px-3 bg-neutral-100 hover:bg-neutral-200 rounded-lg text-xs font-semibold text-neutral-700 transition"
+            >
+              <User className="w-3.5 h-3.5" />
+              <span>Sign In to Cloud</span>
+            </Link>
+          </div>
+        )}
       </div>
     </aside>
   );

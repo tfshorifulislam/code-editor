@@ -3,8 +3,10 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { Menu, X, Code2, ArrowRight } from "lucide-react";
+import { useAuth } from "@/components/Auth/AuthContext";
 
 export default function Navbar() {
+  const { user } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navLinks = [
@@ -52,19 +54,31 @@ export default function Navbar() {
 
         {/* Desktop CTA actions */}
         <div className="hidden md:flex items-center gap-3">
-          <Link
-            href="/projects"
-            className="text-sm font-medium landing-muted hover:text-[var(--color-foreground)] px-3 py-2 rounded-[var(--radius-md)] hover:bg-[var(--color-surface-hover)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
-          >
-            Sign In
-          </Link>
-          <Link
-            href="/projects"
-            className="landing-button-primary !py-2 !px-4 text-xs sm:text-sm"
-          >
-            <span>Start Coding Free</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
+          {user ? (
+            <Link
+              href="/projects"
+              className="landing-button-primary !py-2 !px-4 text-xs sm:text-sm"
+            >
+              <span>Workspace Dashboard</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="text-sm font-medium landing-muted hover:text-[var(--color-foreground)] px-3 py-2 rounded-[var(--radius-md)] hover:bg-[var(--color-surface-hover)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/signup"
+                className="landing-button-primary !py-2 !px-4 text-xs sm:text-sm"
+              >
+                <span>Start Coding Free</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </>
+          )}
         </div>
 
         {/* Mobile menu button */}
@@ -101,20 +115,32 @@ export default function Navbar() {
             ))}
           </div>
           <div className="pt-4 border-t border-[var(--color-border)] flex flex-col gap-2">
-            <Link
-              href="/projects"
-              onClick={handleLinkClick}
-              className="w-full text-center text-sm font-medium landing-muted hover:text-[var(--color-foreground)] py-2.5 rounded-[var(--radius-md)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-colors"
-            >
-              Sign In
-            </Link>
-            <Link
-              href="/projects"
-              onClick={handleLinkClick}
-              className="w-full text-center landing-button-primary !py-2.5"
-            >
-              Start Coding Free
-            </Link>
+            {user ? (
+              <Link
+                href="/projects"
+                onClick={handleLinkClick}
+                className="w-full text-center landing-button-primary !py-2.5"
+              >
+                Workspace Dashboard
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  onClick={handleLinkClick}
+                  className="w-full text-center text-sm font-medium landing-muted hover:text-[var(--color-foreground)] py-2.5 rounded-[var(--radius-md)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-colors"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href="/signup"
+                  onClick={handleLinkClick}
+                  className="w-full text-center landing-button-primary !py-2.5"
+                >
+                  Start Coding Free
+                </Link>
+              </>
+            )}
           </div>
         </div>
       )}

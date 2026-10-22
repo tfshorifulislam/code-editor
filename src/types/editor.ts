@@ -5,7 +5,12 @@ export type SupportedLanguage =
   | "css"
   | "json"
   | "markdown"
-  | "python";
+  | "python"
+  | "cpp"
+  | "go"
+  | "rust"
+  | "java"
+  | "plaintext";
 
 export interface ProjectFile {
   id: string;
@@ -15,6 +20,7 @@ export interface ProjectFile {
   language: SupportedLanguage | string;
   isFolder: boolean;
   parentId: string | null;
+  version?: number;
 }
 
 export type ProjectTemplate =
@@ -22,6 +28,10 @@ export type ProjectTemplate =
   | "vanilla-web"
   | "next-app"
   | "node-api"
+  | "python"
+  | "cpp"
+  | "go"
+  | "rust"
   | "blank";
 
 export interface Project {
@@ -76,8 +86,51 @@ export interface AIMessage {
 export type SidebarView =
   | "explorer"
   | "search"
-  | "source-control"
-  | "ai"
+  | "git"
+  | "debug"
+  | "extensions"
   | "settings";
 
-export type BottomTab = "terminal" | "output" | "problems";
+export type BottomTab = "terminal" | "output" | "problems" | "debug";
+
+export interface GitFileStatus {
+  fileId: string;
+  path: string;
+  name: string;
+  status: "modified" | "added" | "deleted" | "untracked";
+  staged: boolean;
+}
+
+export interface GitCommitRecord {
+  id: string;
+  hash: string;
+  message: string;
+  author: string;
+  timestamp: number;
+  branch: string;
+}
+
+export interface ExtensionItem {
+  id: string;
+  name: string;
+  displayName: string;
+  description: string;
+  publisher: string;
+  version: string;
+  downloads: string;
+  rating: number;
+  installed: boolean;
+  category: "Language" | "Themes" | "Linters" | "Formatters" | "Tools";
+}
+
+export interface WorkspaceContainerConfig {
+  id: string;
+  projectId: string;
+  status: "stopped" | "provisioning" | "running" | "error";
+  image: string;
+  port: number;
+  previewUrl?: string;
+  cpuLimit: string;
+  memoryLimit: string;
+  createdAt: number;
+}

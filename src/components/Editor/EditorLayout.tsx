@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import ActivityBar from "./ActivityBar";
 import FileExplorer from "./FileExplorer";
 import EditorTabs from "./EditorTabs";
@@ -11,6 +12,10 @@ import PreviewPanel from "./PreviewPanel";
 import AIAssistantPanel from "./AIAssistantPanel";
 import StatusBar from "./StatusBar";
 import CommandPalette, { CommandItem } from "./CommandPalette";
+import GitPanel from "./GitPanel";
+import DebugPanel from "./DebugPanel";
+import ExtensionsPanel from "./ExtensionsPanel";
+import { cloudApi } from "@/lib/cloud/cloudApi";
 import {
   Project,
   ProjectFile,
@@ -45,6 +50,9 @@ import {
   Sun,
   X,
   ArrowLeft,
+  Cloud,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 
 let layoutCounter = 1000;
@@ -61,6 +69,10 @@ interface EditorLayoutProps {
 }
 
 export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
+  const router = useRouter();
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved" | "error">("saved");
+
   // 1. Projects & active project state with lazy initializer
   const [projects, setProjects] = useState<Project[]>(() => {
     if (typeof window !== "undefined") {
@@ -93,6 +105,42 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
     }
     return null;
   });
+
+  // Fetch full project from cloud API if initialProjectId is provided
+  useEffect(() => {
+    if (!initialProjectId) return;
+    let isCancelled = false;
+
+    async function fetchProject() {
+      try {
+        const cloudProj = await cloudApi.projects.get(initialProjectId!);
+        if (!isCancelled && cloudProj) {
+          setActiveProject(cloudProj);
+        }
+      } catch (err: unknown) {
+        if (!isCancelled && err instanceof Error && err.message === "UNAUTHORIZED") {
+          router.push(`/login?from=/editor/${initialProjectId}`);
+        }
+      }
+    }
+
+    fetchProject();
+    return () => {
+      isCancelled = true;
+    };
+  }, [initialProjectId, router]);
+
+  // Warn on tab close/reload if there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (saveStatus === "unsaved" || saveStatus === "saving") {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [saveStatus]);
 
   const [unsavedFiles, setUnsavedFiles] = useState<Record<string, boolean>>({});
 
@@ -169,9 +217,42 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
     });
   };
 
+  const performCloudSave = useCallback(
+    async (fileId: string, content: string, currentVersion?: number) => {
+      if (!activeProject) return;
+      setSaveStatus("saving");
+      try {
+        const res = await cloudApi.files.saveContent(activeProject.id, fileId, content, currentVersion);
+        if (res.conflict) {
+          setSaveStatus("error");
+          setConsoleMessages((prev) => [
+            ...prev,
+            {
+              id: getEditorUniqueId("conflict"),
+              type: "warn",
+              content: "⚠ Conflict detected: server has a newer version of this file.",
+              timestamp: getTimestamp(),
+            },
+          ]);
+          return;
+        }
+        if (res.error) {
+          setSaveStatus("error");
+          return;
+        }
+        setSaveStatus("saved");
+        setUnsavedFiles((prev) => ({ ...prev, [fileId]: false }));
+      } catch {
+        setSaveStatus("error");
+      }
+    },
+    [activeProject]
+  );
+
   const handleContentChange = (newContent: string) => {
     if (!activeProject || !activeFile) return;
 
+    setSaveStatus("unsaved");
     setUnsavedFiles((prev) => ({ ...prev, [activeFile.id]: true }));
 
     const updatedFiles = activeProject.files.map((f) =>
@@ -182,28 +263,28 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
       ...activeProject,
       files: updatedFiles,
     });
+
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      performCloudSave(activeFile.id, newContent, activeFile.version);
+    }, 1200);
   };
 
   const handleSaveActiveFile = useCallback(() => {
     if (!activeProject || !activeFile) return;
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
-    setUnsavedFiles((prev) => ({ ...prev, [activeFile.id]: false }));
-    setActiveProject({
-      ...activeProject,
-      updatedAt: getTimestamp(),
-    });
-
-    // Log save confirmation
+    performCloudSave(activeFile.id, activeFile.content, activeFile.version);
     setConsoleMessages((prev) => [
       ...prev,
       {
         id: getEditorUniqueId("c"),
         type: "info",
-        content: `Saved ${activeFile.path}`,
+        content: `✓ Cloud saved ${activeFile.path}`,
         timestamp: getTimestamp(),
       },
     ]);
-  }, [activeProject, activeFile]);
+  }, [activeProject, activeFile, performCloudSave]);
 
   const handleCreateFile = (name: string, isFolder: boolean, parentId: string | null) => {
     if (!activeProject) return;
@@ -490,6 +571,39 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
 
         {/* Right Header Action Icons */}
         <div className="flex items-center gap-2">
+          {/* Cloud Autosave Indicator */}
+          <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#161616] border border-[#2b2b2b] text-[11px] font-mono">
+            {saveStatus === "saved" && (
+              <span className="flex items-center gap-1 text-emerald-400">
+                <Cloud className="w-3 h-3 text-emerald-400" />
+                <span>Saved</span>
+              </span>
+            )}
+            {saveStatus === "saving" && (
+              <span className="flex items-center gap-1 text-amber-300">
+                <Loader2 className="w-3 h-3 animate-spin text-amber-300" />
+                <span>Saving...</span>
+              </span>
+            )}
+            {saveStatus === "unsaved" && (
+              <span className="flex items-center gap-1 text-amber-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                <span>Unsaved</span>
+              </span>
+            )}
+            {saveStatus === "error" && (
+              <button
+                type="button"
+                onClick={handleSaveActiveFile}
+                className="flex items-center gap-1 text-rose-400 hover:underline cursor-pointer"
+                title="Click to retry saving"
+              >
+                <AlertCircle className="w-3 h-3 text-rose-400" />
+                <span>Retry</span>
+              </button>
+            )}
+          </div>
+
           <button
             type="button"
             onClick={() => setIsAIOpen((prev) => !prev)}
@@ -593,32 +707,45 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
               </div>
             )}
 
-            {activeSidebarView === "source-control" && (
-              <div className="h-full flex flex-col p-3 text-xs space-y-3">
-                <h4 className="font-bold uppercase tracking-wider text-neutral-400 text-[11px]">
-                  Source Control
-                </h4>
-                <div className="p-3 bg-[#1e1e1e] border border-[#333333] rounded-lg space-y-2">
-                  <div className="flex items-center justify-between text-neutral-300">
-                    <span className="font-semibold">Local Repository</span>
-                    <span className="text-[10px] bg-emerald-950 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-800">
-                      main
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-neutral-400">
-                    Changes are automatically persisted to local storage.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => exportProjectAsJSON(activeProject)}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white rounded text-xs font-medium transition cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Export Project Backup</span>
-                </button>
-              </div>
+            {activeSidebarView === "git" && (
+              <GitPanel
+                project={activeProject}
+                unsavedFiles={unsavedFiles}
+                onSelectFile={handleSelectFile}
+                onCommitSuccess={(msg) => {
+                  setConsoleMessages((prev) => [
+                    ...prev,
+                    {
+                      id: getEditorUniqueId("git"),
+                      type: "info",
+                      content: `✓ Git Commit: "${msg}" recorded in repository.`,
+                      timestamp: getTimestamp(),
+                    },
+                  ]);
+                }}
+              />
             )}
+
+            {activeSidebarView === "debug" && (
+              <DebugPanel
+                project={activeProject}
+                onExecuteCommand={(cmd) => {
+                  setIsTerminalOpen(true);
+                  setTerminalTab("terminal");
+                  setConsoleMessages((prev) => [
+                    ...prev,
+                    {
+                      id: getEditorUniqueId("dbg"),
+                      type: "info",
+                      content: `[Debug Runner]: Executing "${cmd}" in isolated workspace...`,
+                      timestamp: getTimestamp(),
+                    },
+                  ]);
+                }}
+              />
+            )}
+
+            {activeSidebarView === "extensions" && <ExtensionsPanel />}
 
             {activeSidebarView === "settings" && (
               <div className="h-full flex flex-col p-3 text-xs space-y-4 overflow-y-auto">
@@ -747,6 +874,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
         cursorPos={cursorPos}
         onToggleTerminal={() => setIsTerminalOpen((prev) => !prev)}
         isTerminalOpen={isTerminalOpen}
+        saveStatus={saveStatus}
       />
 
       {/* Command Palette Modal */}

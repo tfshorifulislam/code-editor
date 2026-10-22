@@ -492,6 +492,240 @@ export const STARTER_BLANK_FILES: ProjectFile[] = [
   },
 ];
 
+// 6. Python 3 Application Template
+export const STARTER_PYTHON_FILES: ProjectFile[] = [
+  {
+    id: "py-main",
+    name: "main.py",
+    path: "main.py",
+    content: `"""
+Python 3 Cloud Service
+Fast data processor and REST API endpoints.
+"""
+import sys
+import json
+from datetime import datetime
+
+def analyze_data(values):
+    return {
+        "count": len(values),
+        "sum": sum(values),
+        "mean": sum(values) / len(values) if values else 0,
+        "max": max(values) if values else 0,
+        "min": min(values) if values else 0,
+    }
+
+def main():
+    print("=" * 40)
+    print("Python 3 Cloud Workspace Running")
+    print(f"Timestamp: {datetime.utcnow().isoformat()}Z")
+    print("=" * 40)
+
+    sample_metrics = [42, 88, 19, 73, 95, 61, 54]
+    results = analyze_data(sample_metrics)
+    print("\\n[Analysis Summary]:")
+    print(json.dumps(results, indent=2))
+    print("\\nReady for live Python execution.")
+
+if __name__ == "__main__":
+    main()
+`,
+    language: "python",
+    isFolder: false,
+    parentId: null,
+  },
+  {
+    id: "py-reqs",
+    name: "requirements.txt",
+    path: "requirements.txt",
+    content: `fastapi>=0.110.0\nuvicorn>=0.28.0\npydantic>=2.6.0\nrequests>=2.31.0\npytest>=8.0.0\n`,
+    language: "plaintext",
+    isFolder: false,
+    parentId: null,
+  },
+  {
+    id: "py-readme",
+    name: "README.md",
+    path: "README.md",
+    content: `# Python 3 Cloud Workspace\n\nRun with:\n\`\`\`bash\npython main.py\n\`\`\`\n\nInstall dependencies:\n\`\`\`bash\npip install -r requirements.txt\n\`\`\`\n`,
+    language: "markdown",
+    isFolder: false,
+    parentId: null,
+  },
+];
+
+// 7. C++ High-Performance Systems Template
+export const STARTER_CPP_FILES: ProjectFile[] = [
+  {
+    id: "cpp-main",
+    name: "main.cpp",
+    path: "main.cpp",
+    content: `// C++20 Systems Application
+#include <iostream>
+#include <vector>
+#include <numeric>
+#include <iomanip>
+
+int main() {
+    std::cout << "========================================\\n";
+    std::cout << "   C++20 Cloud Workspace Initialized    \\n";
+    std::cout << "========================================\\n";
+
+    std::vector<int> numbers = {10, 20, 30, 40, 50, 100};
+    int total = std::accumulate(numbers.begin(), numbers.end(), 0);
+    double avg = static_cast<double>(total) / numbers.size();
+
+    std::cout << "Element count: " << numbers.size() << "\\n";
+    std::cout << "Total sum:     " << total << "\\n";
+    std::cout << "Average:       " << std::fixed << std::setprecision(2) << avg << "\\n";
+    std::cout << "\\nCompiled and executed natively.\\n";
+
+    return 0;
+}
+`,
+    language: "cpp",
+    isFolder: false,
+    parentId: null,
+  },
+  {
+    id: "cpp-makefile",
+    name: "Makefile",
+    path: "Makefile",
+    content: `CXX = g++\nCXXFLAGS = -std=c++20 -Wall -O2\nTARGET = app\n\nall: $(TARGET)\n\n$(TARGET): main.cpp\n\t$(CXX) $(CXXFLAGS) -o $(TARGET) main.cpp\n\nclean:\n\trm -f $(TARGET)\n\nrun: $(TARGET)\n\t./$(TARGET)\n`,
+    language: "plaintext",
+    isFolder: false,
+    parentId: null,
+  },
+  {
+    id: "cpp-readme",
+    name: "README.md",
+    path: "README.md",
+    content: `# C++ Workspace\n\nCompile and run:\n\`\`\`bash\nmake run\n\`\`\`\n`,
+    language: "markdown",
+    isFolder: false,
+    parentId: null,
+  },
+];
+
+// 8. Go Cloud Microservice Template
+export const STARTER_GO_FILES: ProjectFile[] = [
+  {
+    id: "go-main",
+    name: "main.go",
+    path: "main.go",
+    content: `// Go Cloud Microservice
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"time"
+)
+
+type ServerStatus struct {
+	Service   string    \`json:"service"\`
+	Status    string    \`json:"status"\`
+	Timestamp time.Time \`json:"timestamp"\`
+}
+
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	status := ServerStatus{
+		Service:   "Go Microservice Engine",
+		Status:    "Healthy",
+		Timestamp: time.Now().UTC(),
+	}
+	json.NewEncoder(w).Encode(status)
+}
+
+func main() {
+	fmt.Println("Starting Go Microservice on http://localhost:8080...")
+	http.HandleFunc("/api/health", healthHandler)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "Hello from Go Cloud IDE Workspace! Time: %s", time.Now().Format(time.RFC3339))
+	})
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+`,
+    language: "go",
+    isFolder: false,
+    parentId: null,
+  },
+  {
+    id: "go-mod",
+    name: "go.mod",
+    path: "go.mod",
+    content: `module cloud-service\n\ngo 1.22\n`,
+    language: "plaintext",
+    isFolder: false,
+    parentId: null,
+  },
+  {
+    id: "go-readme",
+    name: "README.md",
+    path: "README.md",
+    content: `# Go Microservice\n\nRun server:\n\`\`\`bash\ngo run main.go\n\`\`\`\n`,
+    language: "markdown",
+    isFolder: false,
+    parentId: null,
+  },
+];
+
+// 9. Rust Systems Project Template
+export const STARTER_RUST_FILES: ProjectFile[] = [
+  {
+    id: "rust-src",
+    name: "src",
+    path: "src",
+    content: "",
+    language: "",
+    isFolder: true,
+    parentId: null,
+  },
+  {
+    id: "rust-main",
+    name: "main.rs",
+    path: "src/main.rs",
+    content: `// Rust High-Performance Application
+fn main() {
+    println!("==========================================");
+    println!("  🦀 Rust Cloud Workspace Initialized!   ");
+    println!("==========================================");
+
+    let items = vec!["Fast", "Memory-Safe", "Concurrent", "Modern"];
+    for (idx, feature) in items.iter().enumerate() {
+        println!("{}. Rust is {}", idx + 1, feature);
+    }
+
+    println!("\\nReady for cargo build and run.");
+}
+`,
+    language: "rust",
+    isFolder: false,
+    parentId: "rust-src",
+  },
+  {
+    id: "rust-cargo",
+    name: "Cargo.toml",
+    path: "Cargo.toml",
+    content: `[package]\nname = "rust-workspace"\nversion = "0.1.0"\nedition = "2021"\n\n[dependencies]\nserde = { version = "1.0", features = ["derive"] }\nserde_json = "1.0"\ntokio = { version = "1.0", features = ["full"] }\n`,
+    language: "toml",
+    isFolder: false,
+    parentId: null,
+  },
+  {
+    id: "rust-readme",
+    name: "README.md",
+    path: "README.md",
+    content: `# Rust Application\n\nRun with Cargo:\n\`\`\`bash\ncargo run\n\`\`\`\n`,
+    language: "markdown",
+    isFolder: false,
+    parentId: null,
+  },
+];
+
 export function getTemplateFiles(template: ProjectTemplate): {
   files: ProjectFile[];
   activeFileId: string;
@@ -522,6 +756,30 @@ export function getTemplateFiles(template: ProjectTemplate): {
         activeFileId: "node-server-js",
         openFileIds: ["node-server-js", "node-package-json", "node-readme-md"],
       };
+    case "python":
+      return {
+        files: STARTER_PYTHON_FILES,
+        activeFileId: "py-main",
+        openFileIds: ["py-main", "py-reqs", "py-readme"],
+      };
+    case "cpp":
+      return {
+        files: STARTER_CPP_FILES,
+        activeFileId: "cpp-main",
+        openFileIds: ["cpp-main", "cpp-makefile", "cpp-readme"],
+      };
+    case "go":
+      return {
+        files: STARTER_GO_FILES,
+        activeFileId: "go-main",
+        openFileIds: ["go-main", "go-mod", "go-readme"],
+      };
+    case "rust":
+      return {
+        files: STARTER_RUST_FILES,
+        activeFileId: "rust-main",
+        openFileIds: ["rust-main", "rust-cargo", "rust-readme"],
+      };
     case "blank":
     default:
       return {
@@ -545,6 +803,10 @@ export function createStarterProject(
     "vanilla-web": "Modern Web Application",
     "next-app": "Next.js App Router Service",
     "node-api": "Node.js REST API",
+    python: "Python 3 Analytics Service",
+    cpp: "C++20 High Performance App",
+    go: "Go Cloud Microservice",
+    rust: "Rust Systems Project",
     blank: "Blank Project Scratchpad",
   };
 

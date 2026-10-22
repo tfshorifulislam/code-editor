@@ -80,6 +80,56 @@ export default function TerminalPanel({
       } else {
         newHistory.push(`cat: ${fileName}: No such file`);
       }
+    } else if (lower.startsWith("python")) {
+      newHistory.push(
+        "Python 3.12.2 (main, Linux x86_64)",
+        "[GCC 13.2.0] on linux",
+        `Executing ${cmd.replace("python", "").trim() || "script"}...`,
+        "✓ Process finished with exit code 0"
+      );
+    } else if (lower.startsWith("go run")) {
+      newHistory.push(
+        "go: downloading dependencies...",
+        "Starting Go HTTP service on :8080",
+        "✓ Server listening on http://localhost:8080"
+      );
+    } else if (lower.startsWith("cargo run") || lower.startsWith("cargo build")) {
+      newHistory.push(
+        "   Compiling rust-workspace v0.1.0 (/workspace)",
+        "    Finished dev [unoptimized + debuginfo] target(s) in 1.42s",
+        "     Running `target/debug/rust-workspace`",
+        "🦀 Rust Cloud Workspace Initialized!"
+      );
+    } else if (lower.startsWith("make") || lower.startsWith("g++")) {
+      newHistory.push(
+        "g++ -std=c++20 -Wall -O2 -o app main.cpp",
+        "./app",
+        "C++20 Cloud Workspace Initialized",
+        "✓ Compilation completed successfully."
+      );
+    } else if (lower.startsWith("git status")) {
+      newHistory.push(
+        "On branch main",
+        "Your branch is up to date with 'origin/main'.",
+        "nothing to commit, working tree clean"
+      );
+    } else if (lower.startsWith("git branch")) {
+      newHistory.push("* main");
+    } else if (lower.startsWith("git log")) {
+      newHistory.push(
+        "commit 7f4a1c9e821 (HEAD -> main)",
+        "Author: Developer <developer@codeeditor.io>",
+        "Date:   Just now",
+        "",
+        "    feat: initialize cloud workspace template"
+      );
+    } else if (lower === "pwd") {
+      newHistory.push(`/workspaces/${project.name.toLowerCase().replace(/\\s+/g, "-")}`);
+    } else if (lower.startsWith("node")) {
+      newHistory.push(
+        "v22.2.0",
+        `Server running on http://localhost:3001`
+      );
     } else if (lower === "npm run dev") {
       newHistory.push(
         "▲ Next.js / Vite build simulator",
@@ -92,7 +142,7 @@ export default function TerminalPanel({
     } else if (lower === "whoami") {
       newHistory.push("developer@code-editor-browser");
     } else {
-      newHistory.push(`bash: ${cmd}: command not found. Type 'help' for instructions.`);
+      newHistory.push(`bash: ${cmd}: command executed. Type 'help' for instructions.`);
     }
 
     setTerminalHistory(newHistory);

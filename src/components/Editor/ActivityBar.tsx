@@ -6,12 +6,13 @@ import {
   Files,
   Search,
   GitBranch,
-  Sparkles,
   Settings,
   Code2,
   Sun,
   Moon,
   FolderGit2,
+  Bug,
+  Blocks,
 } from "lucide-react";
 import { SidebarView } from "@/types/editor";
 
@@ -44,16 +45,28 @@ export default function ActivityBar({
       shortcut: "Ctrl+Shift+F",
     },
     {
-      id: "source-control",
+      id: "git",
       label: "Source Control",
       icon: <GitBranch className="w-5 h-5 stroke-[1.75]" />,
       shortcut: "Ctrl+Shift+G",
     },
     {
-      id: "ai",
-      label: "AI Assistant",
-      icon: <Sparkles className="w-5 h-5 stroke-[1.75] text-[#a78bfa]" />,
-      shortcut: "Ctrl+Shift+A",
+      id: "debug",
+      label: "Run and Debug",
+      icon: <Bug className="w-5 h-5 stroke-[1.75]" />,
+      shortcut: "Ctrl+Shift+D",
+    },
+    {
+      id: "extensions",
+      label: "Extensions",
+      icon: <Blocks className="w-5 h-5 stroke-[1.75]" />,
+      shortcut: "Ctrl+Shift+X",
+    },
+    {
+      id: "settings",
+      label: "Preferences",
+      icon: <Settings className="w-5 h-5 stroke-[1.75]" />,
+      shortcut: "Ctrl+,",
     },
   ];
 
@@ -120,23 +133,6 @@ export default function ActivityBar({
           ) : (
             <Moon className="w-4 h-4" />
           )}
-        </button>
-
-        {/* Settings */}
-        <button
-          type="button"
-          onClick={() => onSelectView("settings")}
-          title="Settings"
-          className={`relative w-12 h-10 flex items-center justify-center transition cursor-pointer ${
-            activeView === "settings"
-              ? "text-white"
-              : "text-neutral-400 hover:text-white hover:bg-[#252525]/60"
-          }`}
-        >
-          {activeView === "settings" && (
-            <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 bg-[var(--color-primary)] rounded-r" />
-          )}
-          <Settings className="w-4 h-4" />
         </button>
       </div>
     </aside>
