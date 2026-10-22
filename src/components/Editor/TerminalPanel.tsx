@@ -130,6 +130,72 @@ export default function TerminalPanel({
         "v22.2.0",
         `Server running on http://localhost:3001`
       );
+    } else if (lower.startsWith("tsc") || lower.startsWith("npx tsc")) {
+      const usesSrc = project.files.some((f) => f.path.startsWith("src/"));
+      const hasBtn = project.files.some((f) => f.path === "components/ui/button.tsx" || f.path === "src/components/ui/button.tsx");
+      const hasCard = project.files.some((f) => f.path === "components/ui/card.tsx" || f.path === "src/components/ui/card.tsx");
+
+      const errors: string[] = [];
+      for (const f of project.files) {
+        if (f.content.includes("@/components/ui/button") && !hasBtn) {
+          errors.push(`${f.path}(1,1): error TS2307: Cannot resolve '@/components/ui/button'.`);
+        }
+        if (f.content.includes("@/components/ui/card") && !hasCard) {
+          errors.push(`${f.path}(1,1): error TS2307: Cannot resolve '@/components/ui/card'.`);
+        }
+      }
+
+      if (errors.length > 0) {
+        newHistory.push(
+          "Running TypeScript compiler (v5.7.2)...",
+          ...errors,
+          `Found ${errors.length} error(s).`
+        );
+      } else {
+        newHistory.push(
+          "Running TypeScript compiler (v5.7.2)...",
+          `Project structure: ${usesSrc ? "src/ directory" : "root directory"}`,
+          `Checked ${project.files.filter((f) => !f.isFolder).length} files across workspace.`,
+          "✨ Finished TypeScript type checking with 0 errors."
+        );
+      }
+    } else if (lower === "npm run build" || lower === "next build") {
+      const usesSrc = project.files.some((f) => f.path.startsWith("src/"));
+      const hasBtn = project.files.some((f) => f.path === "components/ui/button.tsx" || f.path === "src/components/ui/button.tsx");
+      const hasCard = project.files.some((f) => f.path === "components/ui/card.tsx" || f.path === "src/components/ui/card.tsx");
+
+      const errors: string[] = [];
+      for (const f of project.files) {
+        if (f.content.includes("@/components/ui/button") && !hasBtn) {
+          errors.push(`${f.path}(1,1): error TS2307: Cannot resolve '@/components/ui/button'.`);
+        }
+        if (f.content.includes("@/components/ui/card") && !hasCard) {
+          errors.push(`${f.path}(1,1): error TS2307: Cannot resolve '@/components/ui/card'.`);
+        }
+      }
+
+      if (errors.length > 0) {
+        newHistory.push(
+          "▲ Next.js App Router Build",
+          "  Creating an optimized production build ...",
+          "  Running TypeScript ...",
+          ...errors,
+          `Failed to compile: Found ${errors.length} TypeScript error(s).`
+        );
+      } else {
+        newHistory.push(
+          `▲ Next.js 16.4.2 (Turbopack) [${usesSrc ? "src/ layout" : "root layout"}]`,
+          "- Environments: .env",
+          "✓ Creating an optimized production build ...",
+          "✓ Compiled successfully in 680ms",
+          "  Running TypeScript ...",
+          "✓ Finished TypeScript in 1.1s with 0 errors",
+          "✓ Collecting page data using App Router",
+          "✓ Generating static pages (100% verified)",
+          "✓ Finalizing page optimization",
+          "○ (Static) prerendered as static content"
+        );
+      }
     } else if (lower === "npm run dev") {
       newHistory.push(
         "▲ Next.js / Vite build simulator",

@@ -203,8 +203,9 @@ export default nextConfig;
             jsx: "preserve",
             incremental: true,
             plugins: [{ name: "next" }],
+            baseUrl: ".",
             paths: {
-              "@/*": ["./*"],
+              "@/*": ["./*", "./src/*"],
             },
           },
           include: ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

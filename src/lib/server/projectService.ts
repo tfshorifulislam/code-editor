@@ -672,7 +672,7 @@ export async function initializeFrameworkOnProject(
       }
 
       // 4. Add button.tsx
-      const hasButton = project.files.some((f) => f.path === "components/ui/button.tsx");
+      const hasButton = project.files.some((f) => f.path === "components/ui/button.tsx" || f.path === "src/components/ui/button.tsx");
       if (!hasButton) {
         await tx.projectFile.create({
           data: {
@@ -740,6 +740,105 @@ export { Button, buttonVariants };
         });
       }
 
+      // 4b. Add card.tsx
+      const hasCard = project.files.some((f) => f.path === "components/ui/card.tsx" || f.path === "src/components/ui/card.tsx");
+      if (!hasCard) {
+        await tx.projectFile.create({
+          data: {
+            id: generateId("f"),
+            projectId: project.id,
+            name: "card.tsx",
+            path: "components/ui/card.tsx",
+            content: `import * as React from "react";
+import { cn } from "@/lib/utils";
+
+const Card = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn(
+      "rounded-xl border bg-card text-card-foreground shadow",
+      className
+    )}
+    {...props}
+  />
+));
+Card.displayName = "Card";
+
+const CardHeader = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn("flex flex-col space-y-1.5 p-6", className)}
+    {...props}
+  />
+));
+CardHeader.displayName = "CardHeader";
+
+const CardTitle = React.forwardRef<
+  HTMLParagraphElement,
+  React.HTMLAttributes<HTMLHeadingElement>
+>(({ className, ...props }, ref) => (
+  <h3
+    ref={ref}
+    className={cn("font-semibold leading-none tracking-tight", className)}
+    {...props}
+  />
+));
+CardTitle.displayName = "CardTitle";
+
+const CardDescription = React.forwardRef<
+  HTMLParagraphElement,
+  React.HTMLAttributes<HTMLParagraphElement>
+>(({ className, ...props }, ref) => (
+  <p
+    ref={ref}
+    className={cn("text-sm text-muted-foreground", className)}
+    {...props}
+  />
+));
+CardDescription.displayName = "CardDescription";
+
+const CardContent = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div ref={ref} className={cn("p-6 pt-0", className)} {...props} />
+));
+CardContent.displayName = "CardContent";
+
+const CardFooter = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn("flex items-center p-6 pt-0", className)}
+    {...props}
+  />
+));
+CardFooter.displayName = "CardFooter";
+
+export {
+  Card,
+  CardHeader,
+  CardFooter,
+  CardTitle,
+  CardDescription,
+  CardContent,
+};
+`,
+            language: "typescript",
+            isFolder: false,
+            parentId: uiFolder.id,
+          },
+        });
+      }
+
       // 5. Update package.json dependencies
       const pkgFile = project.files.find((f) => f.path === "package.json");
       if (pkgFile) {
@@ -756,6 +855,27 @@ export { Button, buttonVariants };
           await tx.projectFile.update({
             where: { id: pkgFile.id },
             data: { content: JSON.stringify(parsed, null, 2), version: pkgFile.version + 1 },
+          });
+        } catch {
+          // preserve on json parse error
+        }
+      }
+
+      // 6. Ensure tsconfig.json has compatible baseUrl and path aliases
+      const tsconfigFile = project.files.find((f) => f.path === "tsconfig.json");
+      if (tsconfigFile) {
+        try {
+          const parsedTs = JSON.parse(tsconfigFile.content);
+          parsedTs.compilerOptions = parsedTs.compilerOptions || {};
+          parsedTs.compilerOptions.baseUrl = ".";
+          parsedTs.compilerOptions.paths = {
+            ...parsedTs.compilerOptions.paths,
+            "@/*": ["./*", "./src/*"],
+          };
+          parsedTs.compilerOptions.jsx = parsedTs.compilerOptions.jsx || "preserve";
+          await tx.projectFile.update({
+            where: { id: tsconfigFile.id },
+            data: { content: JSON.stringify(parsedTs, null, 2), version: tsconfigFile.version + 1 },
           });
         } catch {
           // preserve on json parse error

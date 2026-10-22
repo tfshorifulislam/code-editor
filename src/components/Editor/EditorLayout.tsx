@@ -47,6 +47,7 @@ import {
   Terminal as TerminalIcon,
   Play,
   RotateCcw,
+  RefreshCw,
   Moon,
   Sun,
   X,
@@ -559,6 +560,27 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
       action: () => setIsInitializeDialogOpen(true),
     },
     {
+      id: "cmd-restart-ts",
+      title: "TypeScript: Restart Language Service & Refresh Diagnostics",
+      category: "TypeScript",
+      shortcut: "Ctrl+Shift+R",
+      icon: <RefreshCw className="w-4 h-4 text-cyan-400" />,
+      action: () => {
+        if (activeProject) {
+          setActiveProject({ ...activeProject, updatedAt: Date.now() });
+          setConsoleMessages((prev) => [
+            ...prev,
+            {
+              id: getEditorUniqueId("ts-restart"),
+              type: "info",
+              content: "✓ TypeScript Language Service restarted and workspace diagnostics refreshed.",
+              timestamp: Date.now(),
+            },
+          ]);
+        }
+      },
+    },
+    {
       id: "cmd-reset",
       title: "Project: Reset to Template Defaults",
       category: "Project",
@@ -880,6 +902,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
           <div className="flex-1 overflow-hidden relative">
             <MonacoEditorComponent
               activeFile={activeFile}
+              project={activeProject}
               settings={settings}
               onChange={handleContentChange}
               onSave={handleSaveActiveFile}

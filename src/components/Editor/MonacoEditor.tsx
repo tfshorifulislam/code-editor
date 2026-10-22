@@ -4,7 +4,8 @@ import React, { useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import type { OnMount } from "@monaco-editor/react";
 import type * as Monaco from "monaco-editor";
-import { ProjectFile, EditorSettings } from "@/types/editor";
+import { ProjectFile, EditorSettings, Project } from "@/types/editor";
+import { configureMonacoTypeScript } from "@/lib/monaco/typescriptService";
 
 // Dynamically import Editor to completely eliminate SSR issues
 const Editor = dynamic(() => import("@monaco-editor/react"), {
@@ -21,6 +22,7 @@ const Editor = dynamic(() => import("@monaco-editor/react"), {
 
 interface MonacoEditorProps {
   activeFile: ProjectFile | null;
+  project?: Project | null;
   settings: EditorSettings;
   onChange: (newContent: string) => void;
   onSave: () => void;
@@ -29,6 +31,7 @@ interface MonacoEditorProps {
 
 export default function MonacoEditorComponent({
   activeFile,
+  project,
   settings,
   onChange,
   onSave,
@@ -40,6 +43,11 @@ export default function MonacoEditorComponent({
   const handleEditorMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
+
+    // Configure TypeScript language service and workspace models
+    if (project) {
+      configureMonacoTypeScript(monaco, project);
+    }
 
     // Register Save command
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
@@ -80,6 +88,13 @@ export default function MonacoEditorComponent({
     }
   }, [settings]);
 
+  // Synchronize TypeScript language service and workspace models whenever project changes
+  useEffect(() => {
+    if (monacoRef.current && project) {
+      configureMonacoTypeScript(monacoRef.current, project);
+    }
+  }, [project]);
+
   if (!activeFile) {
     return (
       <div className="flex h-full w-full flex-col items-center justify-center bg-[#1e1e1e] text-neutral-500 font-sans p-6 text-center select-none">
@@ -119,6 +134,9 @@ export default function MonacoEditorComponent({
     }
   };
 
+  const normalizedPath = activeFile.path.startsWith("/") ? activeFile.path : `/${activeFile.path}`;
+  const fileUriString = `file://${normalizedPath}`;
+
   return (
     <div className="h-full w-full overflow-hidden bg-[#1e1e1e]">
       <Editor
@@ -126,7 +144,7 @@ export default function MonacoEditorComponent({
         width="100%"
         theme={settings.theme === "vs-dark" ? "vs-dark" : "light"}
         language={getLanguage(activeFile)}
-        path={activeFile.path}
+        path={fileUriString}
         value={activeFile.content}
         onChange={(value) => onChange(value || "")}
         onMount={handleEditorMount}
