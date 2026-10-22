@@ -3,15 +3,19 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   RotateCw,
+  RotateCcw,
   ExternalLink,
   Smartphone,
   Tablet,
   Monitor,
   X,
   Loader2,
+  Play,
+  Square,
+  Server,
 } from "lucide-react";
 import { Project } from "@/types/editor";
-import { generatePreviewHtml } from "@/lib/runtime/previewCompiler";
+import { cloudApi } from "@/lib/cloud/cloudApi";
 
 interface PreviewPanelProps {
   project: Project;
@@ -29,15 +33,106 @@ export default function PreviewPanel({
   refreshTrigger = 0,
 }: PreviewPanelProps) {
   const [deviceMode, setDeviceMode] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  const [previewMode, setPreviewMode] = useState<"devserver" | "compiler">("devserver");
   const [refreshKey, setRefreshKey] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  // Compute live preview URL if this is a stored project
-  const isCloudProject = Boolean(project.id && !project.id.startsWith("temp_"));
-  const previewUrl = isCloudProject
-    ? `/api/projects/${encodeURIComponent(project.id)}/preview?t=${refreshKey}_${refreshTrigger}`
-    : undefined;
+  // Dev server state
+  const [serverStatus, setServerStatus] = useState<"stopped" | "starting" | "running" | "error">("stopped");
+  const [serverPort, setServerPort] = useState<number | undefined>(undefined);
+  const [serverUrl, setServerUrl] = useState<string | undefined>(undefined);
+  const [serverLogs, setServerLogs] = useState<string[]>([]);
+  const [serverError, setServerError] = useState<string | undefined>(undefined);
+  const [isActionLoading, setIsActionLoading] = useState(false);
+
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const logsEndRef = useRef<HTMLDivElement>(null);
+
+  // Query server status when project changes
+  useEffect(() => {
+    if (!project.id) return;
+    let isCancelled = false;
+
+    async function loadStatus() {
+      try {
+        const res = await cloudApi.server.getStatus(project.id);
+        if (!isCancelled) {
+          setServerStatus(res.status);
+          setServerPort(res.port);
+          setServerUrl(res.url);
+          setServerLogs(res.logs || []);
+          setServerError(res.error);
+        }
+      } catch {
+        // Fallback
+      }
+    }
+
+    loadStatus();
+    return () => {
+      isCancelled = true;
+    };
+  }, [project.id]);
+
+  // Auto-scroll logs when starting
+  useEffect(() => {
+    if (serverStatus === "starting") {
+      logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [serverLogs, serverStatus]);
+
+  // Start dev server action
+  const handleStartServer = async () => {
+    setIsActionLoading(true);
+    setServerStatus("starting");
+    try {
+      const res = await cloudApi.server.start(project.id);
+      setServerStatus(res.status);
+      setServerPort(res.port);
+      setServerUrl(res.url);
+      setServerLogs(res.logs || []);
+      setServerError(res.error);
+    } catch (err) {
+      setServerStatus("error");
+      setServerError(err instanceof Error ? err.message : "Failed to start dev server");
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  // Stop dev server action
+  const handleStopServer = async () => {
+    setIsActionLoading(true);
+    try {
+      await cloudApi.server.stop(project.id);
+      setServerStatus("stopped");
+      setServerPort(undefined);
+      setServerUrl(undefined);
+    } catch (err) {
+      console.error("Stop dev server error:", err);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  // Restart dev server action
+  const handleRestartServer = async () => {
+    setIsActionLoading(true);
+    setServerStatus("starting");
+    try {
+      const res = await cloudApi.server.restart(project.id);
+      setServerStatus(res.status);
+      setServerPort(res.port);
+      setServerUrl(res.url);
+      setServerLogs(res.logs || []);
+      setServerError(res.error);
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      setServerStatus("error");
+      setServerError(err instanceof Error ? err.message : "Failed to restart dev server");
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
 
   // Listen for console bridge messages from the iframe
   useEffect(() => {
@@ -52,18 +147,14 @@ export default function PreviewPanel({
   }, [onConsoleMessage]);
 
   const handleRefresh = () => {
-    setIsLoading(true);
     setRefreshKey((prev) => prev + 1);
   };
 
   const handleOpenExternal = () => {
-    if (previewUrl) {
-      window.open(`/api/projects/${encodeURIComponent(project.id)}/preview`, "_blank");
+    if (previewMode === "devserver" && serverUrl) {
+      window.open(serverUrl, "_blank");
     } else {
-      const fallbackHtml = generatePreviewHtml(project);
-      const blob = new Blob([fallbackHtml], { type: "text/html" });
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
+      window.open(`/api/projects/${encodeURIComponent(project.id)}/preview`, "_blank");
     }
   };
 
@@ -81,31 +172,99 @@ export default function PreviewPanel({
     }
   };
 
+  const activeIframeSrc =
+    previewMode === "devserver" && serverStatus === "running" && serverUrl
+      ? `${serverUrl}?t=${refreshKey}_${refreshTrigger}`
+      : `/api/projects/${encodeURIComponent(project.id)}/preview?t=${refreshKey}_${refreshTrigger}`;
+
   return (
     <div className="h-full flex flex-col bg-[#1e1e1e] border-l border-[#2b2b2b] select-none z-10 w-full min-w-[320px]">
       {/* Top Address & Controls Bar */}
       <div className="h-10 bg-[#252526] border-b border-[#1e1e1e] px-3 flex items-center justify-between text-xs text-neutral-300 gap-2">
-        {/* Left: Refresh + Address bar */}
-        <div className="flex items-center gap-2 flex-1 max-w-md">
-          <button
-            type="button"
-            onClick={handleRefresh}
-            title="Reload preview (F5)"
-            className="p-1 hover:text-white rounded hover:bg-[#333333] transition cursor-pointer"
-          >
-            {isLoading ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--color-primary)]" />
-            ) : (
-              <RotateCw className="w-3.5 h-3.5" />
-            )}
-          </button>
+        {/* Left: Reload / Controls + Address bar */}
+        <div className="flex items-center gap-1.5 flex-1 max-w-md">
+          {previewMode === "devserver" && serverStatus === "running" ? (
+            <>
+              <button
+                type="button"
+                onClick={handleRefresh}
+                title="Reload preview"
+                className="p-1 hover:text-white rounded hover:bg-[#333333] transition cursor-pointer"
+              >
+                <RotateCw className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={handleRestartServer}
+                disabled={isActionLoading}
+                title="Restart dev server process"
+                className="p-1 text-amber-400 hover:text-amber-300 rounded hover:bg-[#333333] transition cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={handleStopServer}
+                disabled={isActionLoading}
+                title="Stop dev server process"
+                className="p-1 text-rose-400 hover:text-rose-300 rounded hover:bg-[#333333] transition cursor-pointer"
+              >
+                <Square className="w-3.5 h-3.5 fill-current" />
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={previewMode === "devserver" ? handleStartServer : handleRefresh}
+              disabled={isActionLoading}
+              title={previewMode === "devserver" ? "Start dev server process" : "Reload preview"}
+              className="p-1 text-emerald-400 hover:text-emerald-300 rounded hover:bg-[#333333] transition cursor-pointer"
+            >
+              {isActionLoading || serverStatus === "starting" ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : previewMode === "devserver" ? (
+                <Play className="w-3.5 h-3.5 fill-current" />
+              ) : (
+                <RotateCw className="w-3.5 h-3.5" />
+              )}
+            </button>
+          )}
 
-          <div className="flex-1 flex items-center bg-[#1e1e1e] border border-[#333333] px-2.5 py-1 rounded-md text-[11px] font-mono text-neutral-400">
-            <span className="text-emerald-400 mr-1.5">●</span>
-            <span className="text-neutral-200 truncate">http://localhost:3000</span>
-            <span className="ml-auto text-[9px] bg-emerald-950/80 text-emerald-300 px-1 py-0.2 rounded border border-emerald-800/40 shrink-0">
-              Live
-            </span>
+          {/* Address Bar */}
+          <div className="flex-1 flex items-center bg-[#1e1e1e] border border-[#333333] px-2.5 py-1 rounded-md text-[11px] font-mono text-neutral-400 min-w-0">
+            {previewMode === "devserver" ? (
+              <>
+                <span
+                  className={`w-2 h-2 rounded-full mr-1.5 shrink-0 ${
+                    serverStatus === "running"
+                      ? "bg-emerald-400 animate-pulse"
+                      : serverStatus === "starting"
+                      ? "bg-amber-400 animate-ping"
+                      : serverStatus === "error"
+                      ? "bg-rose-400"
+                      : "bg-neutral-600"
+                  }`}
+                />
+                <span className="text-neutral-200 truncate">
+                  {serverStatus === "running" && serverUrl
+                    ? serverUrl
+                    : serverStatus === "starting"
+                    ? `Starting on :${serverPort || 3100}...`
+                    : "Dev Server: Stopped"}
+                </span>
+                <span className="ml-auto text-[9px] px-1.5 py-0.2 rounded border shrink-0 font-sans font-semibold ml-1 bg-emerald-950/80 text-emerald-300 border-emerald-800/40">
+                  {serverStatus === "running" ? "Dev Server" : "Stopped"}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="w-2 h-2 rounded-full bg-cyan-400 mr-1.5 shrink-0" />
+                <span className="text-neutral-200 truncate">Instant Bundler (esbuild)</span>
+                <span className="ml-auto text-[9px] px-1.5 py-0.2 rounded border shrink-0 font-sans font-semibold ml-1 bg-cyan-950/80 text-cyan-300 border-cyan-800/40">
+                  Compiler
+                </span>
+              </>
+            )}
           </div>
         </div>
 
@@ -149,8 +308,34 @@ export default function PreviewPanel({
           </button>
         </div>
 
-        {/* Right: Actions */}
+        {/* Mode Toggle & Window Actions */}
         <div className="flex items-center gap-1">
+          {/* Mode Switcher Pill */}
+          <div className="hidden lg:flex items-center bg-[#1e1e1e] p-0.5 rounded border border-[#333333] text-[10px] font-sans font-medium">
+            <button
+              type="button"
+              onClick={() => setPreviewMode("devserver")}
+              className={`px-2 py-0.5 rounded transition cursor-pointer ${
+                previewMode === "devserver"
+                  ? "bg-[#333333] text-white font-semibold"
+                  : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              Dev Server
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreviewMode("compiler")}
+              className={`px-2 py-0.5 rounded transition cursor-pointer ${
+                previewMode === "compiler"
+                  ? "bg-[#333333] text-white font-semibold"
+                  : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              Fast Compiler
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={handleOpenExternal}
@@ -180,23 +365,99 @@ export default function PreviewPanel({
               : ""
           }`}
         >
-          {previewUrl ? (
+          {/* State 1: Dev Server is Running */}
+          {previewMode === "devserver" && serverStatus === "running" && serverUrl ? (
             <iframe
               ref={iframeRef}
-              key={`${refreshKey}-${refreshTrigger}`}
-              src={previewUrl}
-              onLoad={() => setIsLoading(false)}
-              title="Project Live Preview"
+              key={`${refreshKey}-${refreshTrigger}-${serverPort}`}
+              src={activeIframeSrc}
+              title="Live Development Server Preview"
               sandbox="allow-scripts allow-modals allow-forms allow-same-origin"
               className="w-full h-full border-0 bg-white"
             />
+          ) : previewMode === "devserver" && serverStatus === "starting" ? (
+            /* State 2: Dev Server is Booting */
+            <div className="w-full h-full bg-[#181818] text-white font-mono text-xs flex flex-col p-4">
+              <div className="flex items-center gap-2 pb-3 border-b border-[#2b2b2b] text-neutral-300">
+                <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
+                <span className="font-semibold text-white">Starting Project Development Server...</span>
+                <span className="text-neutral-500 text-[11px] ml-auto">
+                  workspaces/{project.name}
+                </span>
+              </div>
+              <div className="flex-1 overflow-y-auto py-2 space-y-1 text-neutral-400 select-text leading-relaxed">
+                {serverLogs.map((log, idx) => (
+                  <div
+                    key={idx}
+                    className={
+                      log.includes("Ready") || log.includes("Local:")
+                        ? "text-emerald-400 font-semibold"
+                        : log.includes("Error") || log.includes("[stderr]")
+                        ? "text-rose-400"
+                        : ""
+                    }
+                  >
+                    {log}
+                  </div>
+                ))}
+                <div ref={logsEndRef} />
+              </div>
+            </div>
+          ) : previewMode === "devserver" && (serverStatus === "stopped" || serverStatus === "error") ? (
+            /* State 3: Dev Server Stopped / Launch Card */
+            <div className="w-full h-full bg-[#181818] text-white font-sans flex flex-col items-center justify-center p-6 text-center">
+              <div className="max-w-sm w-full bg-[#242426] border border-[#383838] rounded-2xl p-6 shadow-2xl space-y-4">
+                <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 mx-auto flex items-center justify-center">
+                  <Server className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white flex items-center justify-center gap-2">
+                    <span>Live Development Server</span>
+                  </h3>
+                  <p className="text-xs text-neutral-400 mt-1">
+                    Execute the real development runtime ({project.template || "web"}) directly in{" "}
+                    <code className="text-neutral-300 font-mono text-[10px]">workspaces/{project.id}</code>.
+                  </p>
+                </div>
+
+                {serverError && (
+                  <div className="p-2 rounded bg-rose-950/40 border border-rose-800/40 text-rose-300 text-[11px] font-mono text-left overflow-auto max-h-24">
+                    {serverError}
+                  </div>
+                )}
+
+                <div className="pt-2 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={handleStartServer}
+                    disabled={isActionLoading}
+                    className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-950/40"
+                  >
+                    {isActionLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Play className="w-4 h-4 fill-current" />
+                    )}
+                    <span>Start Dev Server</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPreviewMode("compiler")}
+                    className="text-[11px] text-neutral-400 hover:text-white py-1 transition cursor-pointer"
+                  >
+                    Or switch to Fast Compiler (esbuild)
+                  </button>
+                </div>
+              </div>
+            </div>
           ) : (
+            /* State 4: Fast In-Memory Compiler Mode */
             <iframe
               ref={iframeRef}
-              key={`srcdoc-${refreshKey}-${refreshTrigger}`}
-              srcDoc={generatePreviewHtml(project)}
-              onLoad={() => setIsLoading(false)}
-              title="Project Live Preview"
+              key={`compiler-${refreshKey}-${refreshTrigger}`}
+              src={`/api/projects/${encodeURIComponent(project.id)}/preview?t=${refreshKey}_${refreshTrigger}`}
+              title="Fast Compiler Live Preview"
               sandbox="allow-scripts allow-modals allow-forms allow-same-origin"
               className="w-full h-full border-0 bg-white"
             />

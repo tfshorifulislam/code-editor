@@ -24,14 +24,8 @@ import {
   BottomTab,
   EditorSettings,
   ConsoleMessage,
-  ProjectTemplate,
 } from "@/types/editor";
 import {
-  createStarterProject,
-  loadProjects,
-  saveProjects,
-  loadActiveProjectId,
-  saveActiveProjectId,
   loadEditorSettings,
   saveEditorSettings,
   exportProjectAsJSON,
@@ -47,16 +41,13 @@ import {
   Save,
   Terminal as TerminalIcon,
   Play,
-  RotateCcw,
-  RefreshCw,
-  Moon,
-  Sun,
   X,
   ArrowLeft,
   Cloud,
   Loader2,
   AlertCircle,
   ChevronRight,
+  ExternalLink,
 } from "lucide-react";
 
 let layoutCounter = 1000;
@@ -65,7 +56,7 @@ function getEditorUniqueId(prefix: string): string {
   return `${prefix}-${layoutCounter}`;
 }
 function getTimestamp(): number {
-  return 1700000000000 + layoutCounter;
+  return Date.now();
 }
 
 interface EditorLayoutProps {
@@ -77,58 +68,110 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved" | "error">("saved");
 
-  // 1. Projects & active project state with lazy initializer
-  const [projects, setProjects] = useState<Project[]>(() => {
-    if (typeof window !== "undefined") {
-      const existing = loadProjects();
-      if (existing.length > 0) return existing;
-      const initial = createStarterProject("react-ts", "Interactive React App");
-      saveProjects([initial]);
-      saveActiveProjectId(initial.id);
-      return [initial];
-    }
-    return [createStarterProject("react-ts", "Interactive React App")];
-  });
+  // 1. Core Cloud Project State
+  const [activeProject, setActiveProject] = useState<Project | null>(null);
+  const [isLoadingProject, setIsLoadingProject] = useState<boolean>(true);
+  const [projectLoadError, setProjectLoadError] = useState<string | null>(null);
+  const [projectsList, setProjectsList] = useState<Project[]>([]);
+  const [unsavedFiles, setUnsavedFiles] = useState<Record<string, boolean>>({});
 
-  const [activeProject, setActiveProject] = useState<Project | null>(() => {
-    if (typeof window !== "undefined") {
-      const existing = loadProjects();
-      if (initialProjectId) {
-        const found = existing.find((p) => p.id === initialProjectId);
-        if (found) {
-          saveActiveProjectId(found.id);
-          return found;
-        }
-      }
-      const activeId = loadActiveProjectId();
-      if (existing.length > 0) {
-        return existing.find((p) => p.id === activeId) || existing[0];
-      }
-      const initial = createStarterProject("react-ts", "Interactive React App");
-      return initial;
-    }
-    return null;
-  });
+  // 2. Views & Panels
+  const [activeSidebarView, setActiveSidebarView] = useState<SidebarView | null>("explorer");
+  const [isTerminalOpen, setIsTerminalOpen] = useState(true);
+  const [terminalTab, setTerminalTab] = useState<BottomTab>("terminal");
+  const [isPreviewOpen, setIsPreviewOpen] = useState(true);
+  const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
+  const [isAIOpen, setIsAIOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const [isInitializeDialogOpen, setIsInitializeDialogOpen] = useState(false);
 
-  // Fetch full project from cloud API if initialProjectId is provided
+  // 3. Settings & Diagnostics
+  const [settings, setSettings] = useState<EditorSettings>(() => loadEditorSettings());
+  const [cursorPos, setCursorPos] = useState({ line: 1, column: 1 });
+  const [consoleMessages, setConsoleMessages] = useState<ConsoleMessage[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Fetch full cloud project when initialProjectId changes
   useEffect(() => {
-    if (!initialProjectId) return;
-    let isCancelled = false;
+    if (!initialProjectId) {
+      router.push("/projects");
+      return;
+    }
 
-    async function fetchProject() {
+    let isCancelled = false;
+    setIsLoadingProject(true);
+    setProjectLoadError(null);
+
+    async function loadWorkspaceProject() {
       try {
         const cloudProj = await cloudApi.projects.get(initialProjectId!);
-        if (!isCancelled && cloudProj) {
-          setActiveProject(cloudProj);
+        if (isCancelled) return;
+
+        if (!cloudProj) {
+          setProjectLoadError("Project not found or unauthorized.");
+          setIsLoadingProject(false);
+          return;
         }
+
+        // Validate activeFileId
+        let activeId = cloudProj.activeFileId;
+        const fileExists = activeId && cloudProj.files.some((f) => f.id === activeId && !f.isFolder);
+        if (!fileExists) {
+          const priorityCandidates = [
+            "src/app/page.tsx",
+            "app/page.tsx",
+            "src/App.tsx",
+            "src/main.tsx",
+            "index.html",
+            "server.js",
+            "main.py",
+            "main.cpp",
+            "main.go",
+          ];
+          const foundPriority = cloudProj.files.find((f) => !f.isFolder && priorityCandidates.includes(f.path));
+          const firstNonFolder = foundPriority || cloudProj.files.find((f) => !f.isFolder);
+          activeId = firstNonFolder ? firstNonFolder.id : null;
+        }
+
+        const validOpenIds = (cloudProj.openFileIds || []).filter((id) =>
+          cloudProj.files.some((f) => f.id === id && !f.isFolder)
+        );
+        if (activeId && !validOpenIds.includes(activeId)) {
+          validOpenIds.push(activeId);
+        }
+
+        setActiveProject({
+          ...cloudProj,
+          activeFileId: activeId,
+          openFileIds: validOpenIds,
+        });
+
+        // Also load cloud projects list for project switcher modal
+        cloudApi.projects
+          .list("all")
+          .then((list) => {
+            if (!isCancelled) setProjectsList(list);
+          })
+          .catch(() => {});
       } catch (err: unknown) {
-        if (!isCancelled && err instanceof Error && err.message === "UNAUTHORIZED") {
-          router.push(`/login?from=/editor/${initialProjectId}`);
+        if (!isCancelled) {
+          if (err instanceof Error && err.message === "UNAUTHORIZED") {
+            router.push(`/login?from=/editor/${initialProjectId}`);
+            return;
+          }
+          setProjectLoadError(
+            err instanceof Error ? err.message : "Failed to load project from workspace."
+          );
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingProject(false);
         }
       }
     }
 
-    fetchProject();
+    loadWorkspaceProject();
     return () => {
       isCancelled = true;
     };
@@ -146,110 +189,61 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [saveStatus]);
 
-  const [unsavedFiles, setUnsavedFiles] = useState<Record<string, boolean>>({});
-
-  // 2. Views & Panels
-  const [activeSidebarView, setActiveSidebarView] = useState<SidebarView | null>("explorer");
-  const [isTerminalOpen, setIsTerminalOpen] = useState(true);
-  const [terminalTab, setTerminalTab] = useState<BottomTab>("terminal");
-  const [isPreviewOpen, setIsPreviewOpen] = useState(true);
-  const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
-  const [isAIOpen, setIsAIOpen] = useState(false);
-  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
-  const [isInitializeDialogOpen, setIsInitializeDialogOpen] = useState(false);
-
-  // 3. Settings & diagnostics
-  const [settings, setSettings] = useState<EditorSettings>(() => loadEditorSettings());
-  const [cursorPos, setCursorPos] = useState({ line: 1, column: 1 });
-  const [consoleMessages, setConsoleMessages] = useState<ConsoleMessage[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-
-  // Sync active project state to storage
-  useEffect(() => {
-    if (!activeProject) return;
-    saveActiveProjectId(activeProject.id);
-    const updated = projects.map((p) => (p.id === activeProject.id ? activeProject : p));
-    saveProjects(updated);
-  }, [activeProject, projects]);
-
   // Active file helper
   const activeFile = activeProject?.files.find((f) => f.id === activeProject.activeFileId) || null;
   const openFiles = (activeProject?.openFileIds || [])
     .map((id) => activeProject?.files.find((f) => f.id === id))
     .filter((f): f is ProjectFile => !!f && !f.isFolder);
 
-  // File Operations
-  const handleSelectFile = useCallback((fileId: string) => {
-    if (!activeProject) return;
-    const file = activeProject.files.find((f) => f.id === fileId);
-    if (!file || file.isFolder) return;
-
-    const nextOpen = activeProject.openFileIds.includes(fileId)
-      ? activeProject.openFileIds
-      : [...activeProject.openFileIds, fileId];
-
-    setActiveProject({
-      ...activeProject,
-      activeFileId: fileId,
-      openFileIds: nextOpen,
-      updatedAt: Date.now(),
-    });
-  }, [activeProject]);
-
-  const handleCloseTab = (fileId: string, e: MouseEvent) => {
-    e.stopPropagation();
-    if (!activeProject) return;
-
-    const nextOpen = activeProject.openFileIds.filter((id) => id !== fileId);
-    let nextActive = activeProject.activeFileId;
-
-    if (activeProject.activeFileId === fileId) {
-      nextActive = nextOpen.length > 0 ? nextOpen[nextOpen.length - 1] : null;
-    }
-
-    // Clean unsaved status
-    setUnsavedFiles((prev) => {
-      const copy = { ...prev };
-      delete copy[fileId];
-      return copy;
-    });
-
-    setActiveProject({
-      ...activeProject,
-      activeFileId: nextActive,
-      openFileIds: nextOpen,
-      updatedAt: getTimestamp(),
-    });
-  };
-
+  // Save implementation: writes to database and physical filesystem
   const performCloudSave = useCallback(
-    async (fileId: string, content: string, currentVersion?: number) => {
+    async (fileId: string, content: string) => {
       if (!activeProject) return;
       setSaveStatus("saving");
       try {
-        const res = await cloudApi.files.saveContent(activeProject.id, fileId, content, currentVersion);
-        if (res.conflict) {
+        const res = await cloudApi.files.saveContent(activeProject.id, fileId, content);
+        if (res.error) {
           setSaveStatus("error");
           setConsoleMessages((prev) => [
             ...prev,
             {
-              id: getEditorUniqueId("conflict"),
-              type: "warn",
-              content: "⚠ Conflict detected: server has a newer version of this file.",
+              id: getEditorUniqueId("err"),
+              type: "error",
+              content: `Save failed: ${res.error}`,
               timestamp: getTimestamp(),
             },
           ]);
           return;
         }
-        if (res.error) {
-          setSaveStatus("error");
-          return;
+
+        if (res.file) {
+          const updatedVersion = res.file.version;
+          setActiveProject((prev) => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              files: prev.files.map((f) =>
+                f.id === fileId ? { ...f, content, version: updatedVersion } : f
+              ),
+              updatedAt: getTimestamp(),
+            };
+          });
         }
+
         setSaveStatus("saved");
         setUnsavedFiles((prev) => ({ ...prev, [fileId]: false }));
-      } catch {
+        setPreviewRefreshKey((k) => k + 1);
+      } catch (err) {
         setSaveStatus("error");
+        setConsoleMessages((prev) => [
+          ...prev,
+          {
+            id: getEditorUniqueId("err"),
+            type: "error",
+            content: `Save failed: ${err instanceof Error ? err.message : "Network error"}`,
+            timestamp: getTimestamp(),
+          },
+        ]);
       }
     },
     [activeProject]
@@ -261,150 +255,196 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
     setSaveStatus("unsaved");
     setUnsavedFiles((prev) => ({ ...prev, [activeFile.id]: true }));
 
-    const updatedFiles = activeProject.files.map((f) =>
-      f.id === activeFile.id ? { ...f, content: newContent } : f
-    );
-
-    setActiveProject({
-      ...activeProject,
-      files: updatedFiles,
+    // Keep active file in React state responsive
+    setActiveProject((prev) => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        files: prev.files.map((f) =>
+          f.id === activeFile.id ? { ...f, content: newContent } : f
+        ),
+      };
     });
 
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
-      performCloudSave(activeFile.id, newContent, activeFile.version);
-    }, 1200);
+      performCloudSave(activeFile.id, newContent);
+    }, 1000);
   };
 
   const handleSaveActiveFile = useCallback(() => {
     if (!activeProject || !activeFile) return;
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
-    performCloudSave(activeFile.id, activeFile.content, activeFile.version);
-    setPreviewRefreshKey((k) => k + 1);
+    performCloudSave(activeFile.id, activeFile.content);
     setConsoleMessages((prev) => [
       ...prev,
       {
         id: getEditorUniqueId("c"),
         type: "info",
-        content: `✓ Cloud saved ${activeFile.path}`,
+        content: `✓ Saved ${activeFile.path}`,
         timestamp: getTimestamp(),
       },
     ]);
   }, [activeProject, activeFile, performCloudSave]);
 
+  const handleSelectFile = useCallback(
+    (fileId: string) => {
+      if (!activeProject) return;
+      const file = activeProject.files.find((f) => f.id === fileId);
+      if (!file || file.isFolder) return;
+
+      // If switching away from an unsaved file, flush save immediately
+      if (activeFile && unsavedFiles[activeFile.id]) {
+        performCloudSave(activeFile.id, activeFile.content);
+      }
+
+      const nextOpen = activeProject.openFileIds.includes(fileId)
+        ? activeProject.openFileIds
+        : [...activeProject.openFileIds, fileId];
+
+      setActiveProject((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          activeFileId: fileId,
+          openFileIds: nextOpen,
+          updatedAt: getTimestamp(),
+        };
+      });
+    },
+    [activeProject, activeFile, unsavedFiles, performCloudSave]
+  );
+
+  const handleCloseTab = (fileId: string, e: MouseEvent) => {
+    e.stopPropagation();
+    if (!activeProject) return;
+
+    // If tab being closed has unsaved changes, flush save
+    const closingFile = activeProject.files.find((f) => f.id === fileId);
+    if (closingFile && unsavedFiles[fileId]) {
+      performCloudSave(fileId, closingFile.content);
+    }
+
+    const nextOpen = activeProject.openFileIds.filter((id) => id !== fileId);
+    let nextActive = activeProject.activeFileId;
+
+    if (activeProject.activeFileId === fileId) {
+      nextActive = nextOpen.length > 0 ? nextOpen[nextOpen.length - 1] : null;
+    }
+
+    setUnsavedFiles((prev) => {
+      const copy = { ...prev };
+      delete copy[fileId];
+      return copy;
+    });
+
+    setActiveProject((prev) => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        activeFileId: nextActive,
+        openFileIds: nextOpen,
+        updatedAt: getTimestamp(),
+      };
+    });
+  };
+
   const handleCreateFile = async (name: string, isFolder: boolean, parentId: string | null) => {
     if (!activeProject) return;
 
-    const parent = activeProject.files.find((f) => f.id === parentId);
-    const parentPath = parent ? parent.path : "";
-    const newPath = parentPath ? `${parentPath}/${name}` : name;
-    const tempId = getEditorUniqueId("file");
+    try {
+      const serverFile = await cloudApi.files.create(activeProject.id, {
+        name,
+        isFolder,
+        parentId,
+        content: isFolder ? "" : `// ${name}\n`,
+      });
 
-    const newFile: ProjectFile = {
-      id: tempId,
-      name,
-      path: newPath,
-      content: isFolder ? "" : `// ${name}\n`,
-      language: isFolder ? "" : name.split(".").pop() || "plaintext",
-      isFolder,
-      parentId,
-      version: 1,
-    };
-
-    const nextFiles = [...activeProject.files, newFile];
-    const nextOpen = isFolder ? activeProject.openFileIds : [...activeProject.openFileIds, newFile.id];
-
-    setActiveProject({
-      ...activeProject,
-      files: nextFiles,
-      activeFileId: isFolder ? activeProject.activeFileId : newFile.id,
-      openFileIds: nextOpen,
-      updatedAt: getTimestamp(),
-    });
-
-    if (initialProjectId || activeProject.id.startsWith("proj_")) {
-      try {
-        const serverFile = await cloudApi.files.create(activeProject.id, {
-          name,
-          isFolder,
-          parentId,
-          content: newFile.content,
+      if (serverFile) {
+        setActiveProject((prev) => {
+          if (!prev) return null;
+          const nextFiles = [...prev.files, serverFile];
+          const nextOpen = isFolder ? prev.openFileIds : [...prev.openFileIds, serverFile.id];
+          return {
+            ...prev,
+            files: nextFiles,
+            openFileIds: nextOpen,
+            activeFileId: isFolder ? prev.activeFileId : serverFile.id,
+            updatedAt: getTimestamp(),
+          };
         });
-        if (serverFile) {
-          setActiveProject((prev) => {
-            if (!prev) return null;
-            const updatedFiles = prev.files.map((f) => (f.id === tempId ? serverFile : f));
-            const updatedOpen = prev.openFileIds.map((id) => (id === tempId ? serverFile.id : id));
-            const updatedActive = prev.activeFileId === tempId ? serverFile.id : prev.activeFileId;
-            return {
-              ...prev,
-              files: updatedFiles,
-              openFileIds: updatedOpen,
-              activeFileId: updatedActive,
-            };
-          });
-        }
-      } catch (err) {
-        console.error("Cloud file creation error:", err);
       }
+    } catch (err) {
+      console.error("Cloud file creation error:", err);
+      setConsoleMessages((prev) => [
+        ...prev,
+        {
+          id: getEditorUniqueId("err"),
+          type: "error",
+          content: `Failed to create file: ${err instanceof Error ? err.message : "Error"}`,
+          timestamp: getTimestamp(),
+        },
+      ]);
     }
   };
 
   const handleRenameFile = async (fileId: string, newName: string) => {
     if (!activeProject) return;
-    const updated = activeProject.files.map((f) => {
-      if (f.id !== fileId) return f;
-      const parts = f.path.split("/");
-      parts[parts.length - 1] = newName;
-      return { ...f, name: newName, path: parts.join("/") };
-    });
-    setActiveProject({ ...activeProject, files: updated, updatedAt: getTimestamp() });
 
-    if (initialProjectId || activeProject.id.startsWith("proj_")) {
-      try {
-        await cloudApi.files.rename(activeProject.id, fileId, newName);
-      } catch (err) {
-        console.error("Cloud file rename error:", err);
+    try {
+      const updated = await cloudApi.files.rename(activeProject.id, fileId, newName);
+      if (updated) {
+        setActiveProject((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            files: prev.files.map((f) => (f.id === fileId ? updated : f)),
+            updatedAt: getTimestamp(),
+          };
+        });
       }
+    } catch (err) {
+      console.error("File rename error:", err);
     }
   };
 
   const handleDeleteFile = async (fileId: string) => {
     if (!activeProject) return;
 
-    // Collect all descendant ids if folder
-    const toDeleteIds = new Set<string>([fileId]);
-    const findChildren = (pid: string) => {
-      activeProject.files.forEach((f) => {
-        if (f.parentId === pid) {
-          toDeleteIds.add(f.id);
-          findChildren(f.id);
-        }
+    try {
+      await cloudApi.files.delete(activeProject.id, fileId);
+
+      // Collect descendant ids if folder
+      const toDeleteIds = new Set<string>([fileId]);
+      const findChildren = (pid: string) => {
+        activeProject.files.forEach((f) => {
+          if (f.parentId === pid) {
+            toDeleteIds.add(f.id);
+            findChildren(f.id);
+          }
+        });
+      };
+      findChildren(fileId);
+
+      setActiveProject((prev) => {
+        if (!prev) return null;
+        const nextFiles = prev.files.filter((f) => !toDeleteIds.has(f.id));
+        const nextOpen = prev.openFileIds.filter((id) => !toDeleteIds.has(id));
+        const nextActive = toDeleteIds.has(prev.activeFileId || "")
+          ? nextOpen[nextOpen.length - 1] || null
+          : prev.activeFileId;
+
+        return {
+          ...prev,
+          files: nextFiles,
+          openFileIds: nextOpen,
+          activeFileId: nextActive,
+          updatedAt: getTimestamp(),
+        };
       });
-    };
-    findChildren(fileId);
-
-    const nextFiles = activeProject.files.filter((f) => !toDeleteIds.has(f.id));
-    const nextOpen = activeProject.openFileIds.filter((id) => !toDeleteIds.has(id));
-    const nextActive = toDeleteIds.has(activeProject.activeFileId || "")
-      ? nextOpen[nextOpen.length - 1] || null
-      : activeProject.activeFileId;
-
-    setActiveProject({
-      ...activeProject,
-      files: nextFiles,
-      openFileIds: nextOpen,
-      activeFileId: nextActive,
-      updatedAt: getTimestamp(),
-    });
-
-    if (initialProjectId || activeProject.id.startsWith("proj_")) {
-      try {
-        await cloudApi.files.delete(activeProject.id, fileId);
-      } catch (err) {
-        console.error("Cloud file delete error:", err);
-      }
+    } catch (err) {
+      console.error("File delete error:", err);
     }
   };
 
@@ -414,9 +454,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
     let targetFolderPath = "";
     if (targetFolderId) {
       const folder = activeProject.files.find((f) => f.id === targetFolderId && f.isFolder);
-      if (folder) {
-        targetFolderPath = folder.path;
-      }
+      if (folder) targetFolderPath = folder.path;
     }
 
     const fileList = Array.from(files);
@@ -452,7 +490,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
             ...prev,
             files: nextFiles,
             openFileIds: nextOpen,
-            activeFileId: first ? first.id : prev.activeFileId,
+            activeFileId: first && !first.isFolder ? first.id : prev.activeFileId,
             updatedAt: getTimestamp(),
           };
         });
@@ -486,44 +524,16 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
     const targetFile = activeProject.files.find((f) => f.id === fileId);
     if (!targetFile) return;
 
-    const updatedFiles = activeProject.files.map((f) =>
-      f.id === fileId ? { ...f, content: newContent } : f
-    );
-
-    setActiveProject({
-      ...activeProject,
-      files: updatedFiles,
-      updatedAt: getTimestamp(),
-    });
-
+    performCloudSave(fileId, newContent);
     setConsoleMessages((prev) => [
       ...prev,
       {
         id: getEditorUniqueId("ai"),
         type: "info",
-        content: `✓ AI Diff applied to ${targetFile.path}`,
+        content: `✓ AI Diff applied and saved to ${targetFile.path}`,
         timestamp: getTimestamp(),
       },
     ]);
-  };
-
-  const handleResetProject = () => {
-    if (!activeProject) return;
-    const confirmed = window.confirm("Reset this project's files back to starter template?");
-    if (!confirmed) return;
-
-    const fresh = createStarterProject(activeProject.template, activeProject.name);
-    setActiveProject({ ...fresh, id: activeProject.id });
-  };
-
-  const handleSwitchTemplate = (template: ProjectTemplate) => {
-    const fresh = createStarterProject(template);
-    const updatedList = [...projects, fresh];
-    setProjects(updatedList);
-    setActiveProject(fresh);
-    saveProjects(updatedList);
-    saveActiveProjectId(fresh.id);
-    setIsProjectModalOpen(false);
   };
 
   const handleConsoleMessage = (type: "log" | "error" | "warn" | "info", text: string) => {
@@ -560,7 +570,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
       {
         id: getEditorUniqueId("prev-run"),
         type: "info",
-        content: "▶ Run Preview: Generating live application build...",
+        content: "▶ Run Preview: Triggered application refresh...",
         timestamp: getTimestamp(),
       },
     ]);
@@ -613,100 +623,89 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
       id: "cmd-new-file",
       title: "File: New File",
       category: "File",
+      shortcut: "Alt+N",
       icon: <Plus className="w-4 h-4 text-cyan-400" />,
       action: () => {
-        setActiveSidebarView("explorer");
+        const name = prompt("Enter file name (e.g. component.tsx, styles.css):");
+        if (name) handleCreateFile(name, false, null);
       },
     },
     {
-      id: "cmd-preview",
-      title: "Run: Run Live Preview",
-      category: "Run",
+      id: "cmd-run-preview",
+      title: "View: Run Live Preview",
+      category: "View",
       shortcut: "F5",
       icon: <Play className="w-4 h-4 text-emerald-400" />,
-      action: handleRunPreview,
+      action: () => handleRunPreview(),
     },
     {
-      id: "cmd-terminal",
-      title: "View: Toggle Terminal Panel",
-      category: "View",
-      shortcut: "Ctrl+`",
-      icon: <TerminalIcon className="w-4 h-4 text-cyan-400" />,
-      action: () => setIsTerminalOpen((prev) => !prev),
-    },
-    {
-      id: "cmd-ai",
-      title: "AI: Open AI Coding Assistant",
+      id: "cmd-ai-assistant",
+      title: "AI: Toggle AI Coding Assistant",
       category: "AI",
       shortcut: "Ctrl+Shift+A",
-      icon: <Sparkles className="w-4 h-4 text-[#a78bfa]" />,
+      icon: <Sparkles className="w-4 h-4 text-purple-400" />,
       action: () => setIsAIOpen((prev) => !prev),
     },
     {
-      id: "cmd-theme",
-      title: `Preferences: Switch to ${settings.theme === "vs-dark" ? "Light" : "Dark"} Theme`,
-      category: "Preferences",
-      icon: settings.theme === "vs-dark" ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-blue-400" />,
-      action: () => {
-        const next = settings.theme === "vs-dark" ? "light" : "vs-dark";
-        const updated = { ...settings, theme: next as "vs-dark" | "light" };
-        setSettings(updated);
-        saveEditorSettings(updated);
-      },
-    },
-    {
-      id: "cmd-export",
-      title: "Project: Export Project as JSON",
-      category: "Project",
-      icon: <Download className="w-4 h-4 text-neutral-400" />,
-      action: () => {
-        if (activeProject) exportProjectAsJSON(activeProject);
-      },
+      id: "cmd-toggle-terminal",
+      title: "View: Toggle Terminal Panel",
+      category: "View",
+      shortcut: "Ctrl+`",
+      icon: <TerminalIcon className="w-4 h-4 text-amber-400" />,
+      action: () => setIsTerminalOpen((prev) => !prev),
     },
     {
       id: "cmd-initialize-framework",
-      title: "Project: Initialize Framework / Add Tooling...",
+      title: "Project: Initialize Framework / Add Tooling",
       category: "Project",
-      shortcut: "Ctrl+Shift+I",
       icon: <FolderCog className="w-4 h-4 text-amber-400" />,
       action: () => setIsInitializeDialogOpen(true),
     },
     {
-      id: "cmd-restart-ts",
-      title: "TypeScript: Restart Language Service & Refresh Diagnostics",
-      category: "TypeScript",
-      shortcut: "Ctrl+Shift+R",
-      icon: <RefreshCw className="w-4 h-4 text-cyan-400" />,
-      action: () => {
-        if (activeProject) {
-          setActiveProject({ ...activeProject, updatedAt: Date.now() });
-          setConsoleMessages((prev) => [
-            ...prev,
-            {
-              id: getEditorUniqueId("ts-restart"),
-              type: "info",
-              content: "✓ TypeScript Language Service restarted and workspace diagnostics refreshed.",
-              timestamp: Date.now(),
-            },
-          ]);
-        }
-      },
-    },
-    {
-      id: "cmd-reset",
-      title: "Project: Reset to Template Defaults",
+      id: "cmd-export-json",
+      title: "Project: Export as JSON",
       category: "Project",
-      icon: <RotateCcw className="w-4 h-4 text-rose-400" />,
-      action: () => handleResetProject(),
+      icon: <Download className="w-4 h-4 text-blue-400" />,
+      action: () => {
+        if (activeProject) exportProjectAsJSON(activeProject);
+      },
     },
   ];
 
-  if (!activeProject) {
+  // 1. Loading State
+  if (isLoadingProject) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-[#1e1e1e] text-white font-mono text-sm">
-        <div className="flex items-center gap-3">
-          <span className="w-3 h-3 rounded-full bg-[var(--color-primary)] animate-ping" />
-          <span>Initializing workspace...</span>
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#181818] text-white font-sans gap-3 select-none">
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--color-primary)]" />
+        <span className="text-sm font-medium text-neutral-300">Loading project workspace...</span>
+        <span className="text-xs text-neutral-500 font-mono">Connecting to cloud storage and filesystem</span>
+      </div>
+    );
+  }
+
+  // 2. Honest Error State (Never falls back to dummy project)
+  if (projectLoadError || !activeProject) {
+    return (
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#181818] text-white font-sans p-6 select-none">
+        <div className="max-w-md w-full bg-[#252526] border border-[#3c3c3c] rounded-2xl p-6 text-center space-y-4 shadow-2xl">
+          <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-400 mx-auto flex items-center justify-center">
+            <AlertCircle className="w-6 h-6" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-white">Project Not Found</h2>
+            <p className="text-sm text-neutral-400 mt-1">
+              {projectLoadError || "The requested workspace could not be found or you do not have permission to view it."}
+            </p>
+          </div>
+          <div className="pt-2">
+            <Link
+              href="/projects"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white text-xs font-semibold transition cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Return to Projects Dashboard</span>
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -734,7 +733,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
           <button
             type="button"
             onClick={() => setIsProjectModalOpen(true)}
-            className="flex items-center gap-1.5 hover:text-white px-2 py-0.5 rounded hover:bg-[#2b2b2b] transition font-medium"
+            className="flex items-center gap-1.5 hover:text-white px-2 py-0.5 rounded hover:bg-[#2b2b2b] transition font-medium cursor-pointer"
           >
             <FolderGit2 className="w-3.5 h-3.5 text-amber-400" />
             <span>{activeProject.name}</span>
@@ -747,11 +746,13 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
           <button
             type="button"
             onClick={() => setIsCommandPaletteOpen(true)}
-            className="w-full flex items-center justify-between bg-[#141414] hover:bg-[#282828] border border-[#333333] px-3 py-1 rounded text-neutral-400 hover:text-neutral-200 transition text-xs font-mono"
+            className="w-full flex items-center justify-between bg-[#141414] hover:bg-[#282828] border border-[#333333] px-3 py-1 rounded text-neutral-400 hover:text-neutral-200 transition text-xs font-mono cursor-pointer"
           >
             <span className="flex items-center gap-1.5 truncate">
               <Search className="w-3 h-3 text-neutral-500" />
-              <span className="truncate">{activeProject.name} / {activeFile ? activeFile.name : "Search files..."}</span>
+              <span className="truncate">
+                {activeProject.name} / {activeFile ? activeFile.name : "Search files..."}
+              </span>
             </span>
             <kbd className="text-[10px] bg-neutral-800 px-1.5 py-0.2 rounded text-neutral-400 border border-neutral-700">
               ⌘P
@@ -794,7 +795,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
             )}
           </div>
 
-          {/* AI Agent Entry Point (Single Source of Truth) */}
+          {/* AI Agent Entry Point */}
           <button
             type="button"
             onClick={() => setIsAIOpen((prev) => !prev)}
@@ -809,7 +810,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
             <span className="hidden sm:inline">AI Agent</span>
           </button>
 
-          {/* Run Preview Button (Single Source of Truth) */}
+          {/* Run Preview Button */}
           <button
             type="button"
             onClick={handleRunPreview}
@@ -855,47 +856,51 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
                 onCreateFile={handleCreateFile}
                 onRenameFile={handleRenameFile}
                 onDeleteFile={handleDeleteFile}
-                onResetProject={handleResetProject}
+                onResetProject={() => setIsInitializeDialogOpen(true)}
                 onOpenInitializeProject={() => setIsInitializeDialogOpen(true)}
                 onUploadFiles={handleUploadFiles}
               />
             )}
 
             {activeSidebarView === "search" && (
-              <div className="h-full flex flex-col p-3 text-xs">
-                <h4 className="font-bold uppercase tracking-wider text-neutral-400 mb-2 text-[11px]">
-                  Search across project
-                </h4>
+              <div className="flex-1 flex flex-col p-3 text-xs">
+                <span className="font-semibold text-neutral-400 uppercase tracking-wider mb-2">
+                  Search in Workspace
+                </span>
                 <div className="relative mb-3">
+                  <Search className="w-3.5 h-3.5 text-neutral-500 absolute left-2.5 top-2.5" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search string in files..."
-                    className="w-full bg-[#1e1e1e] border border-[#333333] px-2.5 py-1.5 rounded text-xs text-white outline-none focus:border-[var(--color-primary)]"
+                    placeholder="Search text in project files..."
+                    className="w-full bg-[#1e1e1e] border border-[#3c3c3c] rounded pl-8 pr-2.5 py-1.5 text-white outline-none focus:border-[var(--color-primary)] font-mono text-xs"
                   />
                 </div>
                 <div className="flex-1 overflow-y-auto space-y-1">
-                  {searchQuery.trim() ? (
-                    activeProject.files
-                      .filter((f) => !f.isFolder && f.content.toLowerCase().includes(searchQuery.toLowerCase()))
-                      .map((file) => (
-                        <div
-                          key={file.id}
-                          onClick={() => handleSelectFile(file.id)}
-                          className="p-2 rounded bg-[#1e1e1e] hover:bg-[#2c2c2d] cursor-pointer transition"
-                        >
-                          <div className="font-medium text-white flex items-center gap-1.5">
-                            <FileCode className="w-3.5 h-3.5 text-cyan-400" />
-                            <span>{file.name}</span>
-                          </div>
-                          <p className="text-[10px] text-neutral-400 font-mono mt-1 truncate">
-                            {file.path}
-                          </p>
-                        </div>
-                      ))
+                  {searchQuery.trim() === "" ? (
+                    <div className="text-neutral-500 italic p-2">Type to search workspace files...</div>
                   ) : (
-                    <div className="text-neutral-500 italic p-2">Type text to search files.</div>
+                    activeProject.files
+                      .filter(
+                        (f) =>
+                          !f.isFolder &&
+                          (f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            f.content.toLowerCase().includes(searchQuery.toLowerCase()))
+                      )
+                      .map((f) => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => handleSelectFile(f.id)}
+                          className="w-full text-left p-2 rounded hover:bg-[#2a2d2e] flex flex-col gap-0.5 transition cursor-pointer"
+                        >
+                          <span className="font-medium text-white flex items-center gap-1.5">
+                            <FileCode className="w-3.5 h-3.5 text-blue-400" />
+                            {f.path}
+                          </span>
+                        </button>
+                      ))
                   )}
                 </div>
               </div>
@@ -912,7 +917,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
                     {
                       id: getEditorUniqueId("git"),
                       type: "info",
-                      content: `✓ Git Commit: "${msg}" recorded in repository.`,
+                      content: `✓ Git commit: ${msg}`,
                       timestamp: getTimestamp(),
                     },
                   ]);
@@ -923,18 +928,9 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
             {activeSidebarView === "debug" && (
               <DebugPanel
                 project={activeProject}
-                onExecuteCommand={(cmd) => {
+                onExecuteCommand={() => {
                   setIsTerminalOpen(true);
                   setTerminalTab("terminal");
-                  setConsoleMessages((prev) => [
-                    ...prev,
-                    {
-                      id: getEditorUniqueId("dbg"),
-                      type: "info",
-                      content: `[Debug Runner]: Executing "${cmd}" in isolated workspace...`,
-                      timestamp: getTimestamp(),
-                    },
-                  ]);
                 }}
               />
             )}
@@ -942,65 +938,48 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
             {activeSidebarView === "extensions" && <ExtensionsPanel />}
 
             {activeSidebarView === "settings" && (
-              <div className="h-full flex flex-col p-3 text-xs space-y-4 overflow-y-auto">
-                <h4 className="font-bold uppercase tracking-wider text-neutral-400 text-[11px]">
+              <div className="flex-1 p-3 text-xs space-y-4">
+                <span className="font-semibold text-neutral-400 uppercase tracking-wider block">
                   Editor Settings
-                </h4>
-
-                <div className="space-y-1.5">
-                  <label className="text-neutral-300 font-medium block">Font Size ({settings.fontSize}px)</label>
+                </span>
+                <div className="space-y-2">
+                  <label className="text-neutral-300 block">Theme</label>
+                  <select
+                    value={settings.theme}
+                    onChange={(e) => {
+                      const updated = { ...settings, theme: e.target.value as "vs-dark" | "light" };
+                      setSettings(updated);
+                      saveEditorSettings(updated);
+                    }}
+                    className="w-full bg-[#1e1e1e] border border-[#3c3c3c] rounded p-1.5 text-white outline-none"
+                  >
+                    <option value="vs-dark">Dark (VS Dark)</option>
+                    <option value="light">Light</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-neutral-300 block">Font Size: {settings.fontSize}px</label>
                   <input
                     type="range"
-                    min="11"
-                    max="22"
+                    min="10"
+                    max="24"
                     value={settings.fontSize}
                     onChange={(e) => {
                       const updated = { ...settings, fontSize: Number(e.target.value) };
                       setSettings(updated);
                       saveEditorSettings(updated);
                     }}
-                    className="w-full accent-[var(--color-primary)]"
+                    className="w-full"
                   />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-neutral-300 font-medium block">Word Wrap</label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = settings.wordWrap === "on" ? "off" : "on";
-                      const updated = { ...settings, wordWrap: next as "on" | "off" };
-                      setSettings(updated);
-                      saveEditorSettings(updated);
-                    }}
-                    className="w-full py-1.5 bg-[#1e1e1e] border border-[#333333] rounded text-neutral-200 hover:text-white"
-                  >
-                    Wrap: {settings.wordWrap.toUpperCase()}
-                  </button>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-neutral-300 font-medium block">Minimap</label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const updated = { ...settings, minimap: !settings.minimap };
-                      setSettings(updated);
-                      saveEditorSettings(updated);
-                    }}
-                    className="w-full py-1.5 bg-[#1e1e1e] border border-[#333333] rounded text-neutral-200 hover:text-white"
-                  >
-                    Minimap: {settings.minimap ? "ENABLED" : "DISABLED"}
-                  </button>
                 </div>
               </div>
             )}
           </aside>
         )}
 
-        {/* Center Main Editor Column + Bottom Terminal */}
-        <main className="flex-1 flex flex-col overflow-hidden min-w-0 bg-[#1e1e1e]">
-          {/* File Tabs */}
+        {/* Central Editor Area */}
+        <main className="flex-1 flex flex-col overflow-hidden bg-[#1e1e1e]">
+          {/* Top File Tabs Bar */}
           <EditorTabs
             openFiles={openFiles}
             activeFileId={activeProject.activeFileId}
@@ -1092,12 +1071,12 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
             <div className="flex items-center justify-between pb-2 border-b border-[#333333]">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <FolderGit2 className="w-4 h-4 text-amber-400" />
-                <span>Project Management</span>
+                <span>Switch Cloud Project</span>
               </h3>
               <button
                 type="button"
                 onClick={() => setIsProjectModalOpen(false)}
-                className="p-1 hover:text-white rounded"
+                className="p-1 hover:text-white rounded cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1105,98 +1084,71 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
 
             <div className="space-y-2">
               <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block">
-                Framework Setup & Tooling:
+                Your Workspaces:
               </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsProjectModalOpen(false);
-                  setIsInitializeDialogOpen(true);
-                }}
-                className="w-full p-3 rounded-xl bg-[#1e1e1e] hover:bg-[#2c2c2e] border border-amber-500/30 hover:border-amber-500/60 text-left transition flex items-center justify-between cursor-pointer"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400">
-                    <FolderCog className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="font-semibold text-white text-xs">Initialize Framework / Add Tooling</div>
-                    <div className="text-[10px] text-neutral-400 mt-0.5">
-                      Configure Next.js, React, Node, or add shadcn/ui components
+              <div className="max-h-56 overflow-y-auto space-y-1 pr-1">
+                {projectsList.map((p) => (
+                  <Link
+                    key={p.id}
+                    href={`/editor/${p.id}`}
+                    onClick={() => setIsProjectModalOpen(false)}
+                    className={`w-full p-2.5 rounded-lg border text-left transition flex items-center justify-between cursor-pointer ${
+                      p.id === activeProject.id
+                        ? "bg-[#1e1e1e] border-[var(--color-primary)] text-white"
+                        : "bg-[#1e1e1e] hover:bg-[#2c2c2e] border-[#333333] text-neutral-300 hover:text-white"
+                    }`}
+                  >
+                    <div>
+                      <div className="font-semibold text-xs flex items-center gap-2">
+                        <span>{p.name}</span>
+                        {p.id === activeProject.id && (
+                          <span className="text-[10px] bg-emerald-950 text-emerald-400 px-1.5 py-0.2 rounded border border-emerald-800">
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-neutral-400 font-mono mt-0.5">
+                        {p.template} • {p.files?.length || 0} files
+                      </div>
                     </div>
-                  </div>
-                </div>
-                <ChevronRight className="w-3.5 h-3.5 text-neutral-500" />
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block">
-                Switch Starter Template:
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleSwitchTemplate("react-ts")}
-                  className="p-3 rounded-lg bg-[#1e1e1e] hover:bg-[#2c2c2e] border border-[#333333] text-left transition"
-                >
-                  <div className="font-semibold text-white text-xs">React + TypeScript</div>
-                  <div className="text-[10px] text-neutral-400 mt-1">
-                    Vite-ready component tree, counter, task list
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleSwitchTemplate("vanilla-web")}
-                  className="p-3 rounded-lg bg-[#1e1e1e] hover:bg-[#2c2c2e] border border-[#333333] text-left transition"
-                >
-                  <div className="font-semibold text-white text-xs">Vanilla Web</div>
-                  <div className="text-[10px] text-neutral-400 mt-1">
-                    HTML5, modern CSS gradients, interactive JS
-                  </div>
-                </button>
+                    <ChevronRight className="w-3.5 h-3.5 text-neutral-500" />
+                  </Link>
+                ))}
               </div>
             </div>
 
-            {/* Export & Reset Actions */}
-            <div className="pt-2 border-t border-[#333333] flex items-center justify-between text-xs">
-              <button
-                type="button"
-                onClick={() => exportProjectAsJSON(activeProject)}
-                className="flex items-center gap-1.5 py-1.5 px-3 rounded bg-[#1e1e1e] hover:bg-[#2c2c2e] text-neutral-200 border border-[#333333]"
+            <div className="space-y-2 pt-2 border-t border-[#333333]">
+              <Link
+                href="/projects"
+                onClick={() => setIsProjectModalOpen(false)}
+                className="w-full p-2.5 rounded-lg bg-[#1e1e1e] hover:bg-[#2c2c2e] border border-[#333333] text-center text-xs font-semibold text-white transition flex items-center justify-center gap-2 cursor-pointer"
               >
-                <Download className="w-3.5 h-3.5" />
-                <span>Export JSON</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  handleResetProject();
-                  setIsProjectModalOpen(false);
-                }}
-                className="flex items-center gap-1.5 py-1.5 px-3 rounded bg-rose-950/60 hover:bg-rose-900/60 text-rose-300 border border-rose-800"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Reset Files</span>
-              </button>
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Go to Cloud Projects Dashboard</span>
+              </Link>
             </div>
           </div>
         </div>
       )}
 
-      {/* Initialize Framework / Tooling Setup Dialog */}
-      {activeProject && (
+      {/* Framework Initializer Dialog */}
+      {isInitializeDialogOpen && activeProject && (
         <InitializeProjectDialog
+          project={activeProject}
           isOpen={isInitializeDialogOpen}
           onClose={() => setIsInitializeDialogOpen(false)}
-          project={activeProject}
-          onInitialized={(updatedProject) => {
+          onInitialized={(updatedProject: Project) => {
             setActiveProject(updatedProject);
-            setProjects((prev) =>
-              prev.map((p) => (p.id === updatedProject.id ? updatedProject : p))
-            );
+            setIsInitializeDialogOpen(false);
+            setConsoleMessages((prev) => [
+              ...prev,
+              {
+                id: getEditorUniqueId("init"),
+                type: "info",
+                content: `✓ Framework tooling initialized: ${updatedProject.name}`,
+                timestamp: getTimestamp(),
+              },
+            ]);
           }}
         />
       )}

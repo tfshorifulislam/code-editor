@@ -402,7 +402,7 @@ export async function updateProjectFileContent(
   fileId: string,
   userId: string,
   content: string,
-  clientVersion?: number
+  _version?: number
 ) {
   // Verify ownership
   const project = await prisma.project.findFirst({
@@ -415,18 +415,7 @@ export async function updateProjectFileContent(
   });
   if (!file) return { error: "File not found", status: 404 };
 
-  // Optimistic concurrency check: if client sent version and server is newer
-  if (clientVersion !== undefined && clientVersion < file.version) {
-    return {
-      conflict: true,
-      serverVersion: file.version,
-      serverContent: file.content,
-      error: "Conflict: server has a newer version of this file.",
-      status: 409,
-    };
-  }
-
-  const nextVersion = file.version + 1;
+  const nextVersion = (file.version || 0) + 1;
 
   const [updatedFile] = await prisma.$transaction([
     prisma.projectFile.update({
@@ -444,9 +433,11 @@ export async function updateProjectFileContent(
   ]);
 
   // Synchronize saved content to physical workspace on disk
-  await writeProjectFileToDisk(projectId, updatedFile.path, updatedFile.content, false).catch((err) =>
-    console.error("Failed to write updated file to disk:", err)
-  );
+  try {
+    await writeProjectFileToDisk(projectId, updatedFile.path, updatedFile.content, false);
+  } catch (err) {
+    console.error("Failed to write updated file to disk:", err);
+  }
 
   return { file: updatedFile, status: 200 };
 }

@@ -1,14 +1,25 @@
-import React from "react";
-import type { Metadata } from "next";
-import EditorLayout from "@/components/Editor/EditorLayout";
+import { redirect } from "next/navigation";
+import { getSessionUser } from "@/lib/auth/session";
+import prisma from "@/lib/db/prisma";
 
-export const metadata: Metadata = {
-  title: "IDE Workspace — Code Editor",
-  description:
-    "Browser-based coding workspace with Monaco Editor, live web preview, and an intelligent AI coding assistant.",
-};
+export const dynamic = "force-dynamic";
 
-export default function EditorPage() {
-  return <EditorLayout />;
+export default async function EditorPage() {
+  const user = await getSessionUser();
+  if (!user) {
+    redirect("/login?from=/editor");
+  }
+
+  // Find most recent active project for this user
+  const recentProject = await prisma.project.findFirst({
+    where: { ownerId: user.id, isTrash: false },
+    orderBy: { updatedAt: "desc" },
+    select: { id: true },
+  });
+
+  if (recentProject) {
+    redirect(`/editor/${recentProject.id}`);
+  } else {
+    redirect("/projects");
+  }
 }
-

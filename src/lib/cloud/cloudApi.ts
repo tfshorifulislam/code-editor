@@ -295,4 +295,43 @@ export const cloudApi = {
       return data.files || [];
     },
   },
+
+  server: {
+    async getStatus(projectId: string) {
+      const res = await fetch(`/api/projects/${projectId}/server`, { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed to get server status");
+      const data = await res.json();
+      return data.server;
+    },
+    async start(projectId: string) {
+      const res = await fetch(`/api/projects/${projectId}/server`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "start" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to start dev server");
+      return data.server;
+    },
+    async stop(projectId: string) {
+      const res = await fetch(`/api/projects/${projectId}/server`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "stop" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to stop dev server");
+      return data.server;
+    },
+    async restart(projectId: string) {
+      const res = await fetch(`/api/projects/${projectId}/server`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "restart" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to restart dev server");
+      return data.server;
+    },
+  },
 };
