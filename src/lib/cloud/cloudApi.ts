@@ -1,4 +1,10 @@
-import { Project, ProjectFile, ProjectTemplate } from "@/types/editor";
+import {
+  Project,
+  ProjectFile,
+  ProjectTemplate,
+  ProjectCreationPayload,
+  FrameworkInitOptions,
+} from "@/types/editor";
 
 export interface CloudUser {
   id: string;
@@ -103,14 +109,40 @@ export const cloudApi = {
       };
     },
 
-    async create(template: ProjectTemplate, name?: string, description?: string): Promise<Project> {
+    async create(
+      templateOrPayload: ProjectTemplate | Partial<ProjectCreationPayload>,
+      name?: string,
+      description?: string
+    ): Promise<Project> {
+      const body =
+        typeof templateOrPayload === "object"
+          ? templateOrPayload
+          : { template: templateOrPayload, name, description };
+
       const res = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ template, name, description }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create project in cloud.");
+      const p = data.project;
+      return {
+        ...p,
+        createdAt: typeof p.createdAt === "string" ? new Date(p.createdAt).getTime() : p.createdAt,
+        updatedAt: typeof p.updatedAt === "string" ? new Date(p.updatedAt).getTime() : p.updatedAt,
+        openFileIds: typeof p.openFileIds === "string" ? JSON.parse(p.openFileIds) : p.openFileIds || [],
+      };
+    },
+
+    async initialize(id: string, options: FrameworkInitOptions): Promise<Project> {
+      const res = await fetch(`/api/projects/${id}/initialize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(options),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to initialize framework.");
       const p = data.project;
       return {
         ...p,

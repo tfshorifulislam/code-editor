@@ -15,6 +15,7 @@ import CommandPalette, { CommandItem } from "./CommandPalette";
 import GitPanel from "./GitPanel";
 import DebugPanel from "./DebugPanel";
 import ExtensionsPanel from "./ExtensionsPanel";
+import InitializeProjectDialog from "./InitializeProjectDialog";
 import { cloudApi } from "@/lib/cloud/cloudApi";
 import {
   Project,
@@ -53,6 +54,7 @@ import {
   Cloud,
   Loader2,
   AlertCircle,
+  ChevronRight,
 } from "lucide-react";
 
 let layoutCounter = 1000;
@@ -152,6 +154,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
   const [isAIOpen, setIsAIOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const [isInitializeDialogOpen, setIsInitializeDialogOpen] = useState(false);
 
   // 3. Settings & diagnostics
   const [settings, setSettings] = useState<EditorSettings>(() => loadEditorSettings());
@@ -286,21 +289,23 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
     ]);
   }, [activeProject, activeFile, performCloudSave]);
 
-  const handleCreateFile = (name: string, isFolder: boolean, parentId: string | null) => {
+  const handleCreateFile = async (name: string, isFolder: boolean, parentId: string | null) => {
     if (!activeProject) return;
 
     const parent = activeProject.files.find((f) => f.id === parentId);
     const parentPath = parent ? parent.path : "";
     const newPath = parentPath ? `${parentPath}/${name}` : name;
+    const tempId = getEditorUniqueId("file");
 
     const newFile: ProjectFile = {
-      id: getEditorUniqueId("file"),
+      id: tempId,
       name,
       path: newPath,
       content: isFolder ? "" : `// ${name}\n`,
       language: isFolder ? "" : name.split(".").pop() || "plaintext",
       isFolder,
       parentId,
+      version: 1,
     };
 
     const nextFiles = [...activeProject.files, newFile];
@@ -313,9 +318,36 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
       openFileIds: nextOpen,
       updatedAt: getTimestamp(),
     });
+
+    if (initialProjectId || activeProject.id.startsWith("proj_")) {
+      try {
+        const serverFile = await cloudApi.files.create(activeProject.id, {
+          name,
+          isFolder,
+          parentId,
+          content: newFile.content,
+        });
+        if (serverFile) {
+          setActiveProject((prev) => {
+            if (!prev) return null;
+            const updatedFiles = prev.files.map((f) => (f.id === tempId ? serverFile : f));
+            const updatedOpen = prev.openFileIds.map((id) => (id === tempId ? serverFile.id : id));
+            const updatedActive = prev.activeFileId === tempId ? serverFile.id : prev.activeFileId;
+            return {
+              ...prev,
+              files: updatedFiles,
+              openFileIds: updatedOpen,
+              activeFileId: updatedActive,
+            };
+          });
+        }
+      } catch (err) {
+        console.error("Cloud file creation error:", err);
+      }
+    }
   };
 
-  const handleRenameFile = (fileId: string, newName: string) => {
+  const handleRenameFile = async (fileId: string, newName: string) => {
     if (!activeProject) return;
     const updated = activeProject.files.map((f) => {
       if (f.id !== fileId) return f;
@@ -324,9 +356,17 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
       return { ...f, name: newName, path: parts.join("/") };
     });
     setActiveProject({ ...activeProject, files: updated, updatedAt: getTimestamp() });
+
+    if (initialProjectId || activeProject.id.startsWith("proj_")) {
+      try {
+        await cloudApi.files.rename(activeProject.id, fileId, newName);
+      } catch (err) {
+        console.error("Cloud file rename error:", err);
+      }
+    }
   };
 
-  const handleDeleteFile = (fileId: string) => {
+  const handleDeleteFile = async (fileId: string) => {
     if (!activeProject) return;
 
     // Collect all descendant ids if folder
@@ -354,6 +394,14 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
       activeFileId: nextActive,
       updatedAt: getTimestamp(),
     });
+
+    if (initialProjectId || activeProject.id.startsWith("proj_")) {
+      try {
+        await cloudApi.files.delete(activeProject.id, fileId);
+      } catch (err) {
+        console.error("Cloud file delete error:", err);
+      }
+    }
   };
 
   const handleApplyDiff = (fileId: string, newContent: string) => {
@@ -501,6 +549,14 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
       action: () => {
         if (activeProject) exportProjectAsJSON(activeProject);
       },
+    },
+    {
+      id: "cmd-initialize-framework",
+      title: "Project: Initialize Framework / Add Tooling...",
+      category: "Project",
+      shortcut: "Ctrl+Shift+I",
+      icon: <Sparkles className="w-4 h-4 text-amber-400" />,
+      action: () => setIsInitializeDialogOpen(true),
     },
     {
       id: "cmd-reset",
@@ -664,6 +720,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
                 onRenameFile={handleRenameFile}
                 onDeleteFile={handleDeleteFile}
                 onResetProject={handleResetProject}
+                onOpenInitializeProject={() => setIsInitializeDialogOpen(true)}
               />
             )}
 
@@ -912,7 +969,34 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
 
             <div className="space-y-2">
               <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block">
-                Create Starter Template:
+                Framework Setup & Tooling:
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsProjectModalOpen(false);
+                  setIsInitializeDialogOpen(true);
+                }}
+                className="w-full p-3 rounded-xl bg-[#1e1e1e] hover:bg-[#2c2c2e] border border-amber-500/30 hover:border-amber-500/60 text-left transition flex items-center justify-between cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-white text-xs">Initialize Framework / Add Tooling</div>
+                    <div className="text-[10px] text-neutral-400 mt-0.5">
+                      Configure Next.js, React, Node, or add shadcn/ui components
+                    </div>
+                  </div>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-neutral-500" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block">
+                Switch Starter Template:
               </span>
               <div className="grid grid-cols-2 gap-2">
                 <button
@@ -964,6 +1048,21 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Initialize Framework / Tooling Setup Dialog */}
+      {activeProject && (
+        <InitializeProjectDialog
+          isOpen={isInitializeDialogOpen}
+          onClose={() => setIsInitializeDialogOpen(false)}
+          project={activeProject}
+          onInitialized={(updatedProject) => {
+            setActiveProject(updatedProject);
+            setProjects((prev) =>
+              prev.map((p) => (p.id === updatedProject.id ? updatedProject : p))
+            );
+          }}
+        />
       )}
     </div>
   );

@@ -15,6 +15,7 @@ import {
   ChevronRight,
   ChevronDown,
   RefreshCw,
+  Sparkles,
 } from "lucide-react";
 import { Project, ProjectFile } from "@/types/editor";
 
@@ -26,6 +27,7 @@ interface FileExplorerProps {
   onRenameFile: (fileId: string, newName: string) => void;
   onDeleteFile: (fileId: string) => void;
   onResetProject: () => void;
+  onOpenInitializeProject?: () => void;
 }
 
 export default function FileExplorer({
@@ -36,6 +38,7 @@ export default function FileExplorer({
   onRenameFile,
   onDeleteFile,
   onResetProject,
+  onOpenInitializeProject,
 }: FileExplorerProps) {
   const [collapsedFolders, setCollapsedFolders] = useState<Record<string, boolean>>({});
   const [isCreating, setIsCreating] = useState<{ isFolder: boolean; parentId: string | null } | null>(null);
@@ -255,6 +258,16 @@ export default function FileExplorer({
       <div className="h-9 px-3 border-b border-[#333333] flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-neutral-400">
         <span className="truncate">{project.name}</span>
         <div className="flex items-center gap-1">
+          {onOpenInitializeProject && (
+            <button
+              type="button"
+              onClick={onOpenInitializeProject}
+              title="Initialize Framework / Add Tooling"
+              className="p-1 hover:text-white rounded hover:bg-[#333333] transition cursor-pointer text-amber-400 hover:text-amber-300"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => startCreate(false, null)}
@@ -288,8 +301,44 @@ export default function FileExplorer({
         {rootFiles.map((file) => renderItem(file, 0))}
 
         {project.files.length === 0 && (
-          <div className="p-4 text-center text-xs text-neutral-500">
-            No files in project. Click + above to create one.
+          <div className="p-4 text-center space-y-3.5 select-none">
+            <div className="w-10 h-10 rounded-xl bg-[#2a2d2e] border border-[#3c3c3c] flex items-center justify-center mx-auto text-neutral-400">
+              <FolderPlus className="w-5 h-5 text-neutral-400" />
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-xs font-semibold text-neutral-200">Empty Workspace</h4>
+              <p className="text-[11px] text-neutral-400 leading-relaxed px-1">
+                This project has no files yet. Create files or initialize a framework.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => startCreate(false, null)}
+                className="w-full py-1.5 px-3 bg-[#333333] hover:bg-[#3c3c3c] text-white rounded text-xs font-medium flex items-center justify-center gap-2 transition cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>New File</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => startCreate(true, null)}
+                className="w-full py-1.5 px-3 bg-[#2a2d2e] hover:bg-[#333333] text-neutral-300 hover:text-white rounded text-xs font-medium flex items-center justify-center gap-2 border border-[#3c3c3c] transition cursor-pointer"
+              >
+                <FolderPlus className="w-3.5 h-3.5" />
+                <span>New Folder</span>
+              </button>
+              {onOpenInitializeProject && (
+                <button
+                  type="button"
+                  onClick={onOpenInitializeProject}
+                  className="w-full py-1.5 px-3 bg-[var(--color-primary)] hover:opacity-90 text-white rounded text-xs font-medium flex items-center justify-center gap-2 shadow-xs transition cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Initialize Framework</span>
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>

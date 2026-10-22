@@ -1,7 +1,23 @@
 import prisma from "@/lib/db/prisma";
-import { ProjectTemplate } from "@/types/editor";
+import { ProjectTemplate, ProjectCreationPayload, FrameworkInitOptions } from "@/types/editor";
 import { getTemplateFiles } from "@/lib/storage/projectStorage";
+import {
+  generateEmptyWorkspaceFiles,
+  generateBasicWebFiles,
+  generateNextJsProjectFiles,
+  getFilesForFrameworkInit,
+} from "./frameworkEngine";
 import crypto from "crypto";
+
+interface ScaffoldingFile {
+  id?: string;
+  name: string;
+  path: string;
+  content: string;
+  language: string;
+  isFolder: boolean;
+  parentId: string | null;
+}
 
 function generateId(prefix: string = "id"): string {
   return `${prefix}_${crypto.randomBytes(8).toString("hex")}`;
@@ -9,11 +25,63 @@ function generateId(prefix: string = "id"): string {
 
 export async function createCloudProject(
   ownerId: string,
-  template: ProjectTemplate = "react-ts",
+  templateOrPayload: ProjectTemplate | Partial<ProjectCreationPayload> = "react-ts",
   name?: string,
   description?: string
 ) {
-  const { files: templateFiles, activeFileId, openFileIds } = getTemplateFiles(template);
+  let template: ProjectTemplate = "react-ts";
+  let projectName = name?.trim();
+  let projectDesc = description;
+  let templateFiles: ScaffoldingFile[] = [];
+  let activeFileId: string | null = null;
+  let openFileIds: string[] = [];
+
+  if (typeof templateOrPayload === "object") {
+    const p = templateOrPayload;
+    if (p.name) projectName = p.name.trim();
+    if (p.description) projectDesc = p.description;
+
+    if (p.type === "blank") {
+      template = "blank";
+      if (p.blankSubtype === "empty") {
+        const res = generateEmptyWorkspaceFiles();
+        templateFiles = res.files;
+        activeFileId = null;
+        openFileIds = [];
+      } else {
+        const res = generateBasicWebFiles(p.initGit);
+        templateFiles = res.files;
+        activeFileId = res.activeFileId;
+        openFileIds = res.openFileIds;
+      }
+    } else {
+      template = p.template || "next-app";
+      if (template === "next-app") {
+        const res = generateNextJsProjectFiles(p.nextConfig);
+        templateFiles = res.files;
+        activeFileId = res.activeFileId;
+        openFileIds = res.openFileIds;
+      } else {
+        const res = getTemplateFiles(template);
+        templateFiles = res.files;
+        activeFileId = res.activeFileId;
+        openFileIds = res.openFileIds;
+      }
+    }
+  } else {
+    template = templateOrPayload;
+    if (template === "blank") {
+      const res = generateEmptyWorkspaceFiles();
+      templateFiles = res.files;
+      activeFileId = null;
+      openFileIds = [];
+    } else {
+      const res = getTemplateFiles(template);
+      templateFiles = res.files;
+      activeFileId = res.activeFileId;
+      openFileIds = res.openFileIds;
+    }
+  }
 
   const defaultNames: Record<ProjectTemplate, string> = {
     "react-ts": "Interactive React App",
@@ -27,13 +95,14 @@ export async function createCloudProject(
     blank: "Blank Project Scratchpad",
   };
 
-  const projectName = name?.trim() || defaultNames[template] || "New Project";
+  const finalProjectName = projectName || defaultNames[template] || "New Project";
   const projectId = generateId("proj");
 
   // Map old template file IDs to fresh unique IDs while preserving parent-child relations
   const idMap = new Map<string, string>();
   for (const f of templateFiles) {
-    idMap.set(f.id, generateId("f"));
+    const oldId = f.id || f.path;
+    idMap.set(oldId, generateId("f"));
   }
 
   const mappedActiveFileId = activeFileId && idMap.has(activeFileId) ? idMap.get(activeFileId) : null;
@@ -43,8 +112,8 @@ export async function createCloudProject(
     const project = await tx.project.create({
       data: {
         id: projectId,
-        name: projectName,
-        description: description || null,
+        name: finalProjectName,
+        description: projectDesc || null,
         template,
         ownerId,
         starred: false,
@@ -55,8 +124,15 @@ export async function createCloudProject(
     });
 
     for (const f of templateFiles) {
-      const newId = idMap.get(f.id)!;
-      const newParentId = f.parentId && idMap.has(f.parentId) ? idMap.get(f.parentId) : null;
+      const oldId = f.id || f.path;
+      const newId = idMap.get(oldId)!;
+      let newParentId: string | null = null;
+      if (f.parentId && idMap.has(f.parentId)) {
+        newParentId = idMap.get(f.parentId)!;
+      } else if (f.path.includes("/")) {
+        const parentPath = f.path.substring(0, f.path.lastIndexOf("/"));
+        newParentId = idMap.get(parentPath) || null;
+      }
 
       await tx.projectFile.create({
         data: {
@@ -477,4 +553,283 @@ export async function deleteProjectFile(
   }
 
   return { success: true };
+}
+
+export async function initializeFrameworkOnProject(
+  projectId: string,
+  userId: string,
+  options: FrameworkInitOptions
+) {
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, ownerId: userId },
+    include: { files: true },
+  });
+  if (!project) return null;
+
+  if (options.type === "add-shadcn") {
+    return prisma.$transaction(async (tx) => {
+      // 1. Add components.json if not present
+      const hasComponentsJson = project.files.some((f) => f.path === "components.json");
+      if (!hasComponentsJson) {
+        await tx.projectFile.create({
+          data: {
+            id: generateId("f"),
+            projectId: project.id,
+            name: "components.json",
+            path: "components.json",
+            content: JSON.stringify(
+              {
+                $schema: "https://ui.shadcn.com/schema.json",
+                style: "default",
+                rsc: true,
+                tsx: true,
+                tailwind: {
+                  config: "tailwind.config.ts",
+                  css: "app/globals.css",
+                  baseColor: "neutral",
+                  cssVariables: true,
+                },
+                aliases: {
+                  components: "@/components",
+                  utils: "@/lib/utils",
+                  ui: "@/components/ui",
+                },
+              },
+              null,
+              2
+            ),
+            language: "json",
+            isFolder: false,
+            parentId: null,
+          },
+        });
+      }
+
+      // 2. Add lib folder and utils.ts
+      let libFolder = project.files.find((f) => f.isFolder && f.path === "lib");
+      if (!libFolder) {
+        libFolder = await tx.projectFile.create({
+          data: {
+            id: generateId("f"),
+            projectId: project.id,
+            name: "lib",
+            path: "lib",
+            content: "",
+            language: "",
+            isFolder: true,
+            parentId: null,
+          },
+        });
+      }
+
+      const hasUtils = project.files.some((f) => f.path === "lib/utils.ts");
+      if (!hasUtils) {
+        await tx.projectFile.create({
+          data: {
+            id: generateId("f"),
+            projectId: project.id,
+            name: "utils.ts",
+            path: "lib/utils.ts",
+            content: `import { clsx, type ClassValue } from "clsx";\nimport { twMerge } from "tailwind-merge";\n\nexport function cn(...inputs: ClassValue[]) {\n  return twMerge(clsx(inputs));\n}\n`,
+            language: "typescript",
+            isFolder: false,
+            parentId: libFolder.id,
+          },
+        });
+      }
+
+      // 3. Add components folder and components/ui folder
+      let componentsFolder = project.files.find((f) => f.isFolder && f.path === "components");
+      if (!componentsFolder) {
+        componentsFolder = await tx.projectFile.create({
+          data: {
+            id: generateId("f"),
+            projectId: project.id,
+            name: "components",
+            path: "components",
+            content: "",
+            language: "",
+            isFolder: true,
+            parentId: null,
+          },
+        });
+      }
+
+      let uiFolder = project.files.find((f) => f.isFolder && f.path === "components/ui");
+      if (!uiFolder) {
+        uiFolder = await tx.projectFile.create({
+          data: {
+            id: generateId("f"),
+            projectId: project.id,
+            name: "ui",
+            path: "components/ui",
+            content: "",
+            language: "",
+            isFolder: true,
+            parentId: componentsFolder.id,
+          },
+        });
+      }
+
+      // 4. Add button.tsx
+      const hasButton = project.files.some((f) => f.path === "components/ui/button.tsx");
+      if (!hasButton) {
+        await tx.projectFile.create({
+          data: {
+            id: generateId("f"),
+            projectId: project.id,
+            name: "button.tsx",
+            path: "components/ui/button.tsx",
+            content: `import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "@/lib/utils";
+
+const buttonVariants = cva(
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  {
+    variants: {
+      variant: {
+        default: "bg-primary text-primary-foreground shadow hover:bg-primary/90",
+        destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
+        outline: "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
+        secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
+        ghost: "hover:bg-accent hover:text-accent-foreground",
+        link: "text-primary underline-offset-4 hover:underline",
+      },
+      size: {
+        default: "h-9 px-4 py-2",
+        sm: "h-8 rounded-md px-3 text-xs",
+        lg: "h-10 rounded-md px-8",
+        icon: "h-9 w-9",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "default",
+    },
+  }
+);
+
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
+  asChild?: boolean;
+}
+
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, size, asChild = false, ...props }, ref) => {
+    const Comp = asChild ? Slot : "button";
+    return (
+      <Comp
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref}
+        {...props}
+      />
+    );
+  }
+);
+Button.displayName = "Button";
+
+export { Button, buttonVariants };
+`,
+            language: "typescript",
+            isFolder: false,
+            parentId: uiFolder.id,
+          },
+        });
+      }
+
+      // 5. Update package.json dependencies
+      const pkgFile = project.files.find((f) => f.path === "package.json");
+      if (pkgFile) {
+        try {
+          const parsed = JSON.parse(pkgFile.content);
+          parsed.dependencies = {
+            ...parsed.dependencies,
+            clsx: "^2.1.1",
+            "tailwind-merge": "^2.5.5",
+            "class-variance-authority": "^0.7.1",
+            "lucide-react": "^0.469.0",
+            "@radix-ui/react-slot": "^1.1.1",
+          };
+          await tx.projectFile.update({
+            where: { id: pkgFile.id },
+            data: { content: JSON.stringify(parsed, null, 2), version: pkgFile.version + 1 },
+          });
+        } catch {
+          // preserve on json parse error
+        }
+      }
+
+      await tx.project.update({
+        where: { id: project.id },
+        data: { updatedAt: new Date() },
+      });
+
+      return tx.project.findUnique({
+        where: { id: project.id },
+        include: { files: { orderBy: [{ isFolder: "desc" }, { path: "asc" }] } },
+      });
+    });
+  }
+
+  // Otherwise, initialize a new framework (for blank/empty workspaces)
+  const { files: newFiles, activeFileId, openFileIds } = getFilesForFrameworkInit(options);
+
+  return prisma.$transaction(async (tx) => {
+    const idMap = new Map<string, string>();
+    for (const f of newFiles) {
+      const newId = generateId("f");
+      idMap.set(f.path, newId);
+    }
+
+    for (const f of newFiles) {
+      const newId = idMap.get(f.path)!;
+      let parentDbId: string | null = null;
+      if (f.path.includes("/")) {
+        const parentPath = f.path.substring(0, f.path.lastIndexOf("/"));
+        parentDbId = idMap.get(parentPath) || null;
+      }
+
+      await tx.projectFile.create({
+        data: {
+          id: newId,
+          projectId: project.id,
+          name: f.name,
+          path: f.path,
+          content: f.content,
+          language: f.language,
+          isFolder: f.isFolder,
+          parentId: parentDbId,
+          version: 1,
+        },
+      });
+    }
+
+    const mappedActiveId = activeFileId ? idMap.get(activeFileId) || null : null;
+    const mappedOpenIds = openFileIds.map((p) => idMap.get(p) || p);
+
+    let mappedTemplate: ProjectTemplate = project.template as ProjectTemplate;
+    if (options.type === "nextjs") mappedTemplate = "next-app";
+    else if (options.type === "react-vite") mappedTemplate = "react-ts";
+    else if (options.type === "nodejs") mappedTemplate = "node-api";
+    else if (options.type === "python") mappedTemplate = "python";
+    else if (options.type === "html-web") mappedTemplate = "vanilla-web";
+
+    await tx.project.update({
+      where: { id: project.id },
+      data: {
+        template: mappedTemplate,
+        activeFileId: mappedActiveId,
+        openFileIds: JSON.stringify(mappedOpenIds),
+        updatedAt: new Date(),
+      },
+    });
+
+    return tx.project.findUnique({
+      where: { id: project.id },
+      include: { files: { orderBy: [{ isFolder: "desc" }, { path: "asc" }] } },
+    });
+  });
 }

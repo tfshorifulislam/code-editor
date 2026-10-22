@@ -34,6 +34,49 @@ export type ProjectTemplate =
   | "rust"
   | "blank";
 
+export type ProjectCreationType = "blank" | "template";
+export type BlankSubtype = "empty" | "basic-web";
+
+export interface NextJsConfig {
+  typescript: boolean;
+  tailwind: boolean;
+  shadcn: boolean;
+  eslint: boolean;
+  packageManager: "npm" | "pnpm";
+}
+
+export interface ProjectCreationPayload {
+  name: string;
+  type: ProjectCreationType;
+  template?: ProjectTemplate;
+  blankSubtype?: BlankSubtype;
+  description?: string;
+  isPrivate?: boolean;
+  initGit?: boolean;
+  nextConfig?: NextJsConfig;
+}
+
+export type FrameworkInitType =
+  | "nextjs"
+  | "react-vite"
+  | "nodejs"
+  | "python"
+  | "cpp"
+  | "go"
+  | "rust"
+  | "html-web"
+  | "add-shadcn"
+  | "add-tailwind"
+  | "add-eslint";
+
+export interface FrameworkInitOptions {
+  type: FrameworkInitType;
+  nextConfig?: NextJsConfig;
+  shadcnComponents?: string[];
+  express?: boolean;
+  fastapi?: boolean;
+}
+
 export interface Project {
   id: string;
   name: string;

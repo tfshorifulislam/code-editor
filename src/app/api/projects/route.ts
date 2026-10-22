@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { getUserProjects, createCloudProject } from "@/lib/server/projectService";
-import { ProjectTemplate } from "@/types/editor";
 
 export async function GET(req: Request) {
   const user = await getSessionUser();
@@ -32,11 +31,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const template: ProjectTemplate = body.template || "react-ts";
-    const name: string | undefined = body.name;
-    const description: string | undefined = body.description;
-
-    const project = await createCloudProject(user.id, template, name, description);
+    const project = await createCloudProject(user.id, body);
     return NextResponse.json({ project }, { status: 201 });
   } catch (error) {
     console.error("Failed to create cloud project:", error);
