@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, type MouseEvent } from "react";
 import Link from "next/link";
 import {
   Star,
@@ -30,7 +30,7 @@ interface ProjectCardProps {
   project: Project;
   viewMode: "grid" | "list";
   isTrashView?: boolean;
-  onStarToggle: (id: string, e: React.MouseEvent) => void;
+  onStarToggle: (id: string, e: MouseEvent) => void;
   onDuplicate: (id: string) => void;
   onRename: (id: string, currentName: string) => void;
   onTrash: (id: string) => void;

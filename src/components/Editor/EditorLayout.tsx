@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, type MouseEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ActivityBar from "./ActivityBar";
@@ -195,7 +195,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
     });
   }, [activeProject]);
 
-  const handleCloseTab = (fileId: string, e: React.MouseEvent) => {
+  const handleCloseTab = (fileId: string, e: MouseEvent) => {
     e.stopPropagation();
     if (!activeProject) return;
 

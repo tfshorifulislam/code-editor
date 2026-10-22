@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, type ReactNode, type KeyboardEvent } from "react";
 import { Search, FileCode } from "lucide-react";
 import { Project } from "@/types/editor";
 
@@ -8,7 +8,7 @@ export interface CommandItem {
   id: string;
   title: string;
   category: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
   shortcut?: string;
   action: () => void;
 }
@@ -52,7 +52,7 @@ export default function CommandPalette({
     ? filteredCommands
     : [...matchingFiles, ...filteredCommands];
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Escape") {
       onClose();
     } else if (e.key === "ArrowDown") {

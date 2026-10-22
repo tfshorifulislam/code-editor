@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, type MouseEvent } from "react";
 import {
   Folder,
   FolderOpen,
@@ -68,7 +68,7 @@ export default function FileExplorer({
     setNewItemName("");
   };
 
-  const startRename = (file: ProjectFile, e: React.MouseEvent) => {
+  const startRename = (file: ProjectFile, e: MouseEvent) => {
     e.stopPropagation();
     setEditingFileId(file.id);
     setEditingName(file.name);
@@ -81,7 +81,7 @@ export default function FileExplorer({
     setEditingFileId(null);
   };
 
-  const confirmDelete = (file: ProjectFile, e: React.MouseEvent) => {
+  const confirmDelete = (file: ProjectFile, e: MouseEvent) => {
     e.stopPropagation();
     const confirmed = window.confirm(`Delete ${file.isFolder ? "folder" : "file"} "${file.name}"?`);
     if (confirmed) {

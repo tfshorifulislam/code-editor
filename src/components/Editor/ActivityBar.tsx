@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { type ReactNode } from "react";
 import Link from "next/link";
 import {
   Files,
@@ -31,7 +31,7 @@ export default function ActivityBar({
   onToggleTheme,
   onOpenProjectModal,
 }: ActivityBarProps) {
-  const navItems: { id: SidebarView; label: string; icon: React.ReactNode; shortcut: string }[] = [
+  const navItems: { id: SidebarView; label: string; icon: ReactNode; shortcut: string }[] = [
     {
       id: "explorer",
       label: "Explorer",

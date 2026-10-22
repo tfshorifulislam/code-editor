@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, type MouseEvent } from "react";
 import {
   FileCode,
   Play,
@@ -27,7 +27,7 @@ const fileDatabase: Record<FileKey, FileContent> = {
   "Hero.tsx": {
     path: "src/components/Hero.tsx",
     language: "typescript",
-    code: `import React, { useState } from "react";
+    code: `import React, { useState, type MouseEvent } from "react";
 import { ArrowRight, Sparkles } from "lucide-react";
 
 export default function HeroSection() {
@@ -133,7 +133,7 @@ function EditorVisual() {
     }
   };
 
-  const closeTab = (file: FileKey, e: React.MouseEvent) => {
+  const closeTab = (file: FileKey, e: MouseEvent) => {
     e.stopPropagation();
     if (openFiles.length === 1) return;
     const nextTabs = openFiles.filter((f) => f !== file);

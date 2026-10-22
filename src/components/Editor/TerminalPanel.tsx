@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, type FormEvent } from "react";
 import {
   Terminal as TerminalIcon,
   AlertCircle,
@@ -43,7 +43,7 @@ export default function TerminalPanel({
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [terminalHistory, consoleMessages]);
 
-  const handleCommandSubmit = (e: React.FormEvent) => {
+  const handleCommandSubmit = (e: FormEvent) => {
     e.preventDefault();
     const cmd = currentInput.trim();
     if (!cmd) return;

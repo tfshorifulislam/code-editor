@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, type ReactNode, type MouseEvent, type FormEvent } from "react";
 import ProjectsSidebar, { DashboardViewCategory } from "./ProjectsSidebar";
 import ProjectsHeader from "./ProjectsHeader";
 import ProjectCard from "./ProjectCard";
@@ -154,7 +154,7 @@ export default function ProjectsDashboard() {
   }, [projects, currentCategory, filterType, searchQuery, sortBy]);
 
   // Project action handlers (Cloud connected)
-  const handleStarToggle = async (id: string, e: React.MouseEvent) => {
+  const handleStarToggle = async (id: string, e: MouseEvent) => {
     e.stopPropagation();
     const target = projects.find((p) => p.id === id);
     if (!target) return;
@@ -184,7 +184,7 @@ export default function ProjectsDashboard() {
     }
   };
 
-  const handleRenameSubmit = async (e: React.FormEvent) => {
+  const handleRenameSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!renamingProject || !renamingProject.name.trim()) return;
 
@@ -274,7 +274,7 @@ export default function ProjectsDashboard() {
     id: ProjectTemplate;
     title: string;
     desc: string;
-    icon: React.ReactNode;
+    icon: ReactNode;
     tag: string;
   }[] = [
     {

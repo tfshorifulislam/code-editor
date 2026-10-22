@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, type ReactNode, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   X,
@@ -73,7 +73,7 @@ export default function NewProjectDialog({
     id: ProjectTemplate;
     title: string;
     description: string;
-    icon: React.ReactNode;
+    icon: ReactNode;
     tag: string;
     hasOptions?: boolean;
   }[] = [
@@ -136,7 +136,7 @@ export default function NewProjectDialog({
     },
   ];
 
-  const handleNextFromStep1 = (e: React.FormEvent) => {
+  const handleNextFromStep1 = (e: FormEvent) => {
     e.preventDefault();
     if (!projectName.trim()) {
       setError("Please enter a valid project name.");

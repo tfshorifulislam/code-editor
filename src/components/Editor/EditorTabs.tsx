@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { type MouseEvent } from "react";
 import {
   FileCode,
   FileText,
@@ -17,7 +17,7 @@ interface EditorTabsProps {
   activeFileId: string | null;
   unsavedFiles: Record<string, boolean>;
   onSelectTab: (fileId: string) => void;
-  onCloseTab: (fileId: string, e: React.MouseEvent) => void;
+  onCloseTab: (fileId: string, e: MouseEvent) => void;
   onTogglePreview: () => void;
   isPreviewOpen: boolean;
   onToggleAI: () => void;

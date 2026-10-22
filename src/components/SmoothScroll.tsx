@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useSyncExternalStore } from "react";
+import React, { ReactNode, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import { ReactLenis } from "lenis/react";
 
 interface SmoothScrollProps {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 function subscribeReducedMotion(callback: () => void): () => void {

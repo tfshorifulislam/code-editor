@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, type MouseEvent, type FormEvent } from "react";
 import {
   GitBranch,
   Plus,
@@ -46,12 +46,12 @@ export default function GitPanel({
   const stagedFiles = modifiedFiles.filter((f) => stagedIds.has(f.id));
   const unstagedFiles = modifiedFiles.filter((f) => !stagedIds.has(f.id));
 
-  const handleStage = (id: string, e: React.MouseEvent) => {
+  const handleStage = (id: string, e: MouseEvent) => {
     e.stopPropagation();
     setStagedIds((prev) => new Set([...prev, id]));
   };
 
-  const handleUnstage = (id: string, e: React.MouseEvent) => {
+  const handleUnstage = (id: string, e: MouseEvent) => {
     e.stopPropagation();
     setStagedIds((prev) => {
       const copy = new Set(prev);
@@ -68,7 +68,7 @@ export default function GitPanel({
     setStagedIds(new Set());
   };
 
-  const handleCommit = (e: React.FormEvent) => {
+  const handleCommit = (e: FormEvent) => {
     e.preventDefault();
     if (!commitMessage.trim()) return;
 

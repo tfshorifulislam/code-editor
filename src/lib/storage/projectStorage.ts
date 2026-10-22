@@ -24,7 +24,7 @@ export const STARTER_REACT_TS_FILES: ProjectFile[] = [
     id: "f-app-tsx",
     name: "App.tsx",
     path: "src/App.tsx",
-    content: `import React, { useState } from "react";
+    content: `import React, { useState, type FormEvent } from "react";
 
 export default function App() {
   const [count, setCount] = useState(0);
@@ -35,7 +35,7 @@ export default function App() {
   ]);
   const [newTodo, setNewTodo] = useState("");
 
-  const addTodo = (e: React.FormEvent) => {
+  const addTodo = (e: FormEvent) => {
     e.preventDefault();
     if (!newTodo.trim()) return;
     setTodos([...todos, { id: Date.now(), text: newTodo.trim(), done: false }]);
@@ -359,7 +359,9 @@ export const STARTER_NEXT_FILES: ProjectFile[] = [
     id: "n-layout-tsx",
     name: "layout.tsx",
     path: "app/layout.tsx",
-    content: `export default function RootLayout({ children }: { children: React.ReactNode }) {
+    content: `import type { ReactNode } from "react";
+
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body style={{ margin: 0, background: "#ffffff" }}>
