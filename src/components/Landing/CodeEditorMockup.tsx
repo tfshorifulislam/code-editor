@@ -171,10 +171,16 @@ export default function CodeEditorMockup() {
   };
 
   return (
-    <section id="editor-demo" className="py-6 sm:py-12 bg-[var(--color-surface)] relative">
-      <div className="landing-container px-3 sm:px-6">
+    <section id="editor-demo" className="pt-2 pb-14 sm:pb-20 bg-[var(--color-surface)] relative">
+      <div className="landing-container px-3 sm:px-6 relative">
+        {/* Subtle restrained purple glow behind the mockup */}
+        <div
+          className="pointer-events-none absolute -inset-x-4 sm:-inset-x-8 -top-6 -bottom-6 -z-10 bg-gradient-to-b from-[var(--color-primary)]/15 via-[var(--color-primary)]/5 to-transparent blur-2xl opacity-60 rounded-3xl"
+          aria-hidden="true"
+        />
+
         {/* Editor Outer Container with Mac Chrome and refined elevation */}
-        <div className="rounded-[var(--radius-2xl)] border border-[var(--color-border)] bg-[var(--color-code-background)] shadow-2xl overflow-hidden transition-all text-[var(--color-code-foreground)] font-sans">
+        <div className="relative rounded-[var(--radius-2xl)] border border-[var(--color-border)] bg-[var(--color-code-background)] shadow-2xl overflow-hidden transition-all text-[var(--color-code-foreground)] font-sans ring-1 ring-black/10">
           {/* Top Chrome / Window Header */}
           <div className="h-11 bg-[#161B26] border-b border-[#222938] px-3 sm:px-4 flex items-center justify-between select-none">
             {/* macOS traffic light window controls */}

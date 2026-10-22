@@ -1,78 +1,58 @@
 import React from "react";
-import { ArrowRight, Sparkles, CheckCircle2 } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 export default function Hero() {
   return (
-    <section className="landing-section overflow-hidden pt-12 pb-10 sm:pt-20 sm:pb-14">
-      {/* Subtle radial ambient background glow */}
+    <section className="relative overflow-hidden pt-14 pb-8 sm:pt-20 sm:pb-12 lg:pt-24 lg:pb-14 bg-[var(--color-background)]">
+      {/* Subtle ambient decorative lavender glow */}
       <div
         className="pointer-events-none absolute inset-x-0 -top-24 -z-10 flex justify-center overflow-hidden"
         aria-hidden="true"
       >
-        <div className="w-[800px] h-[360px] bg-gradient-to-b from-[var(--color-accent-soft)] via-[var(--color-accent-soft)]/40 to-transparent blur-3xl rounded-full opacity-80" />
+        <div className="w-[720px] h-[340px] bg-gradient-to-b from-[var(--color-accent-soft)] via-[var(--color-accent-soft)]/50 to-transparent blur-3xl rounded-full opacity-75" />
       </div>
 
       <div className="landing-container text-center">
         {/* Announcement Badge */}
-        <div className="landing-eyebrow mb-6 sm:mb-8">
-          <Sparkles className="w-3.5 h-3.5 text-[var(--color-accent)]" />
-          <span>Meet your new AI coding workspace</span>
-          <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] animate-pulse" />
+        <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-[var(--radius-pill)] text-xs sm:text-sm font-medium bg-[var(--color-accent-soft)] text-[var(--color-accent)] border border-[var(--color-accent)]/20 shadow-xs mb-6 sm:mb-8 transition-all duration-200 hover:border-[var(--color-accent)]/40 hover:scale-[1.01]">
+          <span>✦ Meet your new AI coding workspace</span>
         </div>
 
-        {/* Headline */}
-        <h1 className="landing-hero-title max-w-4xl mx-auto">
+        {/* Main Headline */}
+        <h1 className="landing-hero-title max-w-4xl mx-auto tracking-tight font-extrabold">
           Your ideas deserve{" "}
-          <span className="relative inline-block text-[var(--color-accent)]">
+          <span className="bg-gradient-to-r from-[var(--color-primary)] via-[#806BFA] to-[var(--color-primary)] bg-clip-text text-transparent inline-block">
             better code.
-            <span
-              className="absolute -bottom-1 left-0 w-full h-[3px] bg-[var(--color-accent)]/30 rounded-full"
-              aria-hidden="true"
-            />
           </span>
         </h1>
 
-        {/* Description */}
-        <p className="landing-paragraph mt-6 max-w-2xl mx-auto">
+        {/* Supporting Description */}
+        <p className="landing-paragraph mt-6 sm:mt-7 max-w-[620px] mx-auto text-base sm:text-lg leading-relaxed text-[var(--color-muted-foreground)]">
           Write, build, and ship projects faster with an intelligent AI coding
           assistant built right into your workspace.
         </p>
 
-        {/* Action Buttons */}
+        {/* CTA Buttons */}
         <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row items-center justify-center gap-3.5 sm:gap-4">
           <a
             href="#editor-demo"
-            className="landing-button-primary w-full sm:w-auto"
+            className="group landing-button-primary w-full sm:w-auto h-12 px-6 shadow-md hover:shadow-lg shadow-[var(--color-primary)]/20"
           >
             <span>Start Coding Free</span>
-            <ArrowRight className="w-4 h-4" />
+            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
           </a>
           <a
             href="#features"
-            className="landing-button-secondary w-full sm:w-auto"
+            className="landing-button-secondary w-full sm:w-auto h-12 px-6"
           >
             Explore Features
           </a>
         </div>
 
-        {/* Trust text */}
-        <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6 text-xs sm:text-sm landing-muted">
-          <span className="font-medium text-[var(--color-foreground)]">
-            Write code. Build projects. Let AI handle the busywork.
-          </span>
-          <div className="hidden sm:flex items-center gap-4 text-neutral-400">
-            <span>•</span>
-            <span className="inline-flex items-center gap-1 landing-muted">
-              <CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-success)]" />
-              In-browser IDE
-            </span>
-            <span>•</span>
-            <span className="inline-flex items-center gap-1 landing-muted">
-              <CheckCircle2 className="w-3.5 h-3.5 text-[var(--color-success)]" />
-              No installation needed
-            </span>
-          </div>
-        </div>
+        {/* Subtle Trust Caption */}
+        <p className="mt-7 sm:mt-8 text-xs sm:text-sm text-[var(--color-muted-foreground)] font-medium">
+          Write code. Build projects. Let AI handle the busywork.
+        </p>
       </div>
     </section>
   );
