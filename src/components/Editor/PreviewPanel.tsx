@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   RotateCw,
   ExternalLink,
@@ -8,6 +8,7 @@ import {
   Tablet,
   Monitor,
   X,
+  Loader2,
 } from "lucide-react";
 import { Project } from "@/types/editor";
 import { generatePreviewHtml } from "@/lib/runtime/previewCompiler";
@@ -25,17 +26,18 @@ export default function PreviewPanel({
   isOpen,
   onClose,
   onConsoleMessage,
-  refreshTrigger,
+  refreshTrigger = 0,
 }: PreviewPanelProps) {
   const [deviceMode, setDeviceMode] = useState<"desktop" | "tablet" | "mobile">("desktop");
-  const [key, setKey] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  // Generate preview whenever project files change or user refreshes
-  const previewHtml = useMemo(() => {
-    return generatePreviewHtml(project);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project, key, refreshTrigger]);
+  // Compute live preview URL if this is a stored project
+  const isCloudProject = Boolean(project.id && !project.id.startsWith("temp_"));
+  const previewUrl = isCloudProject
+    ? `/api/projects/${encodeURIComponent(project.id)}/preview?t=${refreshKey}_${refreshTrigger}`
+    : undefined;
 
   // Listen for console bridge messages from the iframe
   useEffect(() => {
@@ -50,13 +52,19 @@ export default function PreviewPanel({
   }, [onConsoleMessage]);
 
   const handleRefresh = () => {
-    setKey((prev) => prev + 1);
+    setIsLoading(true);
+    setRefreshKey((prev) => prev + 1);
   };
 
   const handleOpenExternal = () => {
-    const blob = new Blob([previewHtml], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    window.open(url, "_blank");
+    if (previewUrl) {
+      window.open(`/api/projects/${encodeURIComponent(project.id)}/preview`, "_blank");
+    } else {
+      const fallbackHtml = generatePreviewHtml(project);
+      const blob = new Blob([fallbackHtml], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+    }
   };
 
   if (!isOpen) return null;
@@ -82,16 +90,20 @@ export default function PreviewPanel({
           <button
             type="button"
             onClick={handleRefresh}
-            title="Reload preview"
+            title="Reload preview (F5)"
             className="p-1 hover:text-white rounded hover:bg-[#333333] transition cursor-pointer"
           >
-            <RotateCw className="w-3.5 h-3.5" />
+            {isLoading ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--color-primary)]" />
+            ) : (
+              <RotateCw className="w-3.5 h-3.5" />
+            )}
           </button>
 
           <div className="flex-1 flex items-center bg-[#1e1e1e] border border-[#333333] px-2.5 py-1 rounded-md text-[11px] font-mono text-neutral-400">
             <span className="text-emerald-400 mr-1.5">●</span>
-            <span className="text-neutral-200">http://localhost:3000</span>
-            <span className="ml-auto text-[9px] bg-emerald-950/80 text-emerald-300 px-1 py-0.2 rounded border border-emerald-800/40">
+            <span className="text-neutral-200 truncate">http://localhost:3000</span>
+            <span className="ml-auto text-[9px] bg-emerald-950/80 text-emerald-300 px-1 py-0.2 rounded border border-emerald-800/40 shrink-0">
               Live
             </span>
           </div>
@@ -103,7 +115,7 @@ export default function PreviewPanel({
             type="button"
             onClick={() => setDeviceMode("desktop")}
             title="Desktop view"
-            className={`p-1 rounded transition ${
+            className={`p-1 rounded transition cursor-pointer ${
               deviceMode === "desktop"
                 ? "bg-[var(--color-primary)] text-white"
                 : "text-neutral-400 hover:text-white"
@@ -115,7 +127,7 @@ export default function PreviewPanel({
             type="button"
             onClick={() => setDeviceMode("tablet")}
             title="Tablet view (768px)"
-            className={`p-1 rounded transition ${
+            className={`p-1 rounded transition cursor-pointer ${
               deviceMode === "tablet"
                 ? "bg-[var(--color-primary)] text-white"
                 : "text-neutral-400 hover:text-white"
@@ -127,7 +139,7 @@ export default function PreviewPanel({
             type="button"
             onClick={() => setDeviceMode("mobile")}
             title="Mobile view (375px)"
-            className={`p-1 rounded transition ${
+            className={`p-1 rounded transition cursor-pointer ${
               deviceMode === "mobile"
                 ? "bg-[var(--color-primary)] text-white"
                 : "text-neutral-400 hover:text-white"
@@ -168,14 +180,27 @@ export default function PreviewPanel({
               : ""
           }`}
         >
-          <iframe
-            ref={iframeRef}
-            key={key}
-            srcDoc={previewHtml}
-            title="Project Live Preview"
-            sandbox="allow-scripts allow-modals allow-forms"
-            className="w-full h-full border-0 bg-white"
-          />
+          {previewUrl ? (
+            <iframe
+              ref={iframeRef}
+              key={`${refreshKey}-${refreshTrigger}`}
+              src={previewUrl}
+              onLoad={() => setIsLoading(false)}
+              title="Project Live Preview"
+              sandbox="allow-scripts allow-modals allow-forms allow-same-origin"
+              className="w-full h-full border-0 bg-white"
+            />
+          ) : (
+            <iframe
+              ref={iframeRef}
+              key={`srcdoc-${refreshKey}-${refreshTrigger}`}
+              srcDoc={generatePreviewHtml(project)}
+              onLoad={() => setIsLoading(false)}
+              title="Project Live Preview"
+              sandbox="allow-scripts allow-modals allow-forms allow-same-origin"
+              className="w-full h-full border-0 bg-white"
+            />
+          )}
         </div>
       </div>
     </div>

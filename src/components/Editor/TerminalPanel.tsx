@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, type FormEvent } from "react";
+import React, { useState, useRef, useEffect, type FormEvent, type KeyboardEvent } from "react";
 import {
   Terminal as TerminalIcon,
   AlertCircle,
@@ -8,8 +8,9 @@ import {
   Trash2,
   X,
   CheckCircle2,
+  Loader2,
 } from "lucide-react";
-import { BottomTab, ConsoleMessage, Project } from "@/types/editor";
+import { BottomTab, ConsoleMessage, Project, ProjectFile } from "@/types/editor";
 
 interface TerminalPanelProps {
   isOpen: boolean;
@@ -19,6 +20,19 @@ interface TerminalPanelProps {
   consoleMessages: ConsoleMessage[];
   onClearConsole: () => void;
   project: Project;
+  onFilesSynced?: (files: ProjectFile[]) => void;
+}
+
+interface TerminalLine {
+  id: string;
+  text: string;
+  type: "command" | "stdout" | "stderr" | "system" | "success";
+}
+
+let lineCounter = 0;
+function getLineId(): string {
+  lineCounter += 1;
+  return `t-line-${lineCounter}`;
 }
 
 export default function TerminalPanel({
@@ -29,190 +43,184 @@ export default function TerminalPanel({
   consoleMessages,
   onClearConsole,
   project,
+  onFilesSynced,
 }: TerminalPanelProps) {
-  const [terminalHistory, setTerminalHistory] = useState<string[]>([
-    "Code Editor Interactive Shell v1.0.0",
-    "Type 'help' for available commands, or 'npm run dev' to boot development preview.",
-    "",
+  const [terminalLines, setTerminalLines] = useState<TerminalLine[]>([
+    {
+      id: getLineId(),
+      text: "Code Editor Interactive Workspace Terminal",
+      type: "system",
+    },
+    {
+      id: getLineId(),
+      text: `Connected to workspace: ${project.name} (${project.template || "custom"})`,
+      type: "system",
+    },
+    {
+      id: getLineId(),
+      text: "Type 'help' for available commands, or run commands like 'ls', 'node -v', 'touch <file>'.",
+      type: "system",
+    },
   ]);
+
   const [currentInput, setCurrentInput] = useState("");
+  const [currentCwd, setCurrentCwd] = useState("");
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [commandHistory, setCommandHistory] = useState<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState<number>(-1);
+
   const inputRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [terminalHistory, consoleMessages]);
+  }, [terminalLines, consoleMessages]);
 
-  const handleCommandSubmit = (e: FormEvent) => {
+  const promptPrefix = currentCwd ? `~/project/${currentCwd} $` : "~/project $";
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (commandHistory.length === 0) return;
+      const nextIndex = historyIndex < commandHistory.length - 1 ? historyIndex + 1 : historyIndex;
+      setHistoryIndex(nextIndex);
+      setCurrentInput(commandHistory[commandHistory.length - 1 - nextIndex] || "");
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (historyIndex > 0) {
+        const nextIndex = historyIndex - 1;
+        setHistoryIndex(nextIndex);
+        setCurrentInput(commandHistory[commandHistory.length - 1 - nextIndex] || "");
+      } else if (historyIndex === 0) {
+        setHistoryIndex(-1);
+        setCurrentInput("");
+      }
+    }
+  };
+
+  const handleCommandSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const cmd = currentInput.trim();
-    if (!cmd) return;
+    if (!cmd || isExecuting) return;
 
-    const newHistory = [...terminalHistory, `~/project $ ${cmd}`];
+    // Add command to prompt history
+    const commandLine: TerminalLine = {
+      id: getLineId(),
+      text: `${promptPrefix} ${cmd}`,
+      type: "command",
+    };
+
+    setTerminalLines((prev) => [...prev, commandLine]);
+    setCommandHistory((prev) => [...prev, cmd]);
+    setHistoryIndex(-1);
+    setCurrentInput("");
 
     const lower = cmd.toLowerCase();
+
+    // Client-side quick commands
     if (lower === "clear" || lower === "cls") {
-      setTerminalHistory([]);
-      setCurrentInput("");
+      setTerminalLines([]);
       return;
-    } else if (lower === "help") {
-      newHistory.push(
-        "Available commands:",
-        "  help         Show available shell commands",
-        "  ls           List files in current project",
-        "  cat <file>   Display contents of a file",
-        "  npm run dev  Trigger project preview build",
-        "  npm test     Run project test runner",
-        "  clear        Clear the terminal screen",
-        "  date         Show current local date and time",
-        "  whoami       Display active user profile"
-      );
-    } else if (lower === "ls") {
-      const names = project.files.map((f) => (f.isFolder ? `📁 ${f.name}/` : `📄 ${f.name}`));
-      newHistory.push(...names);
-    } else if (lower.startsWith("cat ")) {
-      const fileName = cmd.slice(4).trim();
-      const file = project.files.find(
-        (f) => f.name.toLowerCase() === fileName.toLowerCase() || f.path.toLowerCase() === fileName.toLowerCase()
-      );
-      if (file) {
-        newHistory.push(file.content);
-      } else {
-        newHistory.push(`cat: ${fileName}: No such file`);
-      }
-    } else if (lower.startsWith("python")) {
-      newHistory.push(
-        "Python 3.12.2 (main, Linux x86_64)",
-        "[GCC 13.2.0] on linux",
-        `Executing ${cmd.replace("python", "").trim() || "script"}...`,
-        "✓ Process finished with exit code 0"
-      );
-    } else if (lower.startsWith("go run")) {
-      newHistory.push(
-        "go: downloading dependencies...",
-        "Starting Go HTTP service on :8080",
-        "✓ Server listening on http://localhost:8080"
-      );
-    } else if (lower.startsWith("cargo run") || lower.startsWith("cargo build")) {
-      newHistory.push(
-        "   Compiling rust-workspace v0.1.0 (/workspace)",
-        "    Finished dev [unoptimized + debuginfo] target(s) in 1.42s",
-        "     Running `target/debug/rust-workspace`",
-        "🦀 Rust Cloud Workspace Initialized!"
-      );
-    } else if (lower.startsWith("make") || lower.startsWith("g++")) {
-      newHistory.push(
-        "g++ -std=c++20 -Wall -O2 -o app main.cpp",
-        "./app",
-        "C++20 Cloud Workspace Initialized",
-        "✓ Compilation completed successfully."
-      );
-    } else if (lower.startsWith("git status")) {
-      newHistory.push(
-        "On branch main",
-        "Your branch is up to date with 'origin/main'.",
-        "nothing to commit, working tree clean"
-      );
-    } else if (lower.startsWith("git branch")) {
-      newHistory.push("* main");
-    } else if (lower.startsWith("git log")) {
-      newHistory.push(
-        "commit 7f4a1c9e821 (HEAD -> main)",
-        "Author: Developer <developer@codeeditor.io>",
-        "Date:   Just now",
-        "",
-        "    feat: initialize cloud workspace template"
-      );
-    } else if (lower === "pwd") {
-      newHistory.push(`/workspaces/${project.name.toLowerCase().replace(/\\s+/g, "-")}`);
-    } else if (lower.startsWith("node")) {
-      newHistory.push(
-        "v22.2.0",
-        `Server running on http://localhost:3001`
-      );
-    } else if (lower.startsWith("tsc") || lower.startsWith("npx tsc")) {
-      const usesSrc = project.files.some((f) => f.path.startsWith("src/"));
-      const hasBtn = project.files.some((f) => f.path === "components/ui/button.tsx" || f.path === "src/components/ui/button.tsx");
-      const hasCard = project.files.some((f) => f.path === "components/ui/card.tsx" || f.path === "src/components/ui/card.tsx");
-
-      const errors: string[] = [];
-      for (const f of project.files) {
-        if (f.content.includes("@/components/ui/button") && !hasBtn) {
-          errors.push(`${f.path}(1,1): error TS2307: Cannot resolve '@/components/ui/button'.`);
-        }
-        if (f.content.includes("@/components/ui/card") && !hasCard) {
-          errors.push(`${f.path}(1,1): error TS2307: Cannot resolve '@/components/ui/card'.`);
-        }
-      }
-
-      if (errors.length > 0) {
-        newHistory.push(
-          "Running TypeScript compiler (v5.7.2)...",
-          ...errors,
-          `Found ${errors.length} error(s).`
-        );
-      } else {
-        newHistory.push(
-          "Running TypeScript compiler (v5.7.2)...",
-          `Project structure: ${usesSrc ? "src/ directory" : "root directory"}`,
-          `Checked ${project.files.filter((f) => !f.isFolder).length} files across workspace.`,
-          "✨ Finished TypeScript type checking with 0 errors."
-        );
-      }
-    } else if (lower === "npm run build" || lower === "next build") {
-      const usesSrc = project.files.some((f) => f.path.startsWith("src/"));
-      const hasBtn = project.files.some((f) => f.path === "components/ui/button.tsx" || f.path === "src/components/ui/button.tsx");
-      const hasCard = project.files.some((f) => f.path === "components/ui/card.tsx" || f.path === "src/components/ui/card.tsx");
-
-      const errors: string[] = [];
-      for (const f of project.files) {
-        if (f.content.includes("@/components/ui/button") && !hasBtn) {
-          errors.push(`${f.path}(1,1): error TS2307: Cannot resolve '@/components/ui/button'.`);
-        }
-        if (f.content.includes("@/components/ui/card") && !hasCard) {
-          errors.push(`${f.path}(1,1): error TS2307: Cannot resolve '@/components/ui/card'.`);
-        }
-      }
-
-      if (errors.length > 0) {
-        newHistory.push(
-          "▲ Next.js App Router Build",
-          "  Creating an optimized production build ...",
-          "  Running TypeScript ...",
-          ...errors,
-          `Failed to compile: Found ${errors.length} TypeScript error(s).`
-        );
-      } else {
-        newHistory.push(
-          `▲ Next.js 16.4.2 (Turbopack) [${usesSrc ? "src/ layout" : "root layout"}]`,
-          "- Environments: .env",
-          "✓ Creating an optimized production build ...",
-          "✓ Compiled successfully in 680ms",
-          "  Running TypeScript ...",
-          "✓ Finished TypeScript in 1.1s with 0 errors",
-          "✓ Collecting page data using App Router",
-          "✓ Generating static pages (100% verified)",
-          "✓ Finalizing page optimization",
-          "○ (Static) prerendered as static content"
-        );
-      }
-    } else if (lower === "npm run dev") {
-      newHistory.push(
-        "▲ Next.js / Vite build simulator",
-        "✓ Compiling modules...",
-        `✓ Ready in 480ms on http://localhost:3000`,
-        `✓ Project: ${project.name} (${project.template})`
-      );
-    } else if (lower === "date") {
-      newHistory.push(new Date().toString());
-    } else if (lower === "whoami") {
-      newHistory.push("developer@code-editor-browser");
-    } else {
-      newHistory.push(`bash: ${cmd}: command executed. Type 'help' for instructions.`);
     }
 
-    setTerminalHistory(newHistory);
-    setCurrentInput("");
+    if (lower === "help") {
+      setTerminalLines((prev) => [
+        ...prev,
+        { id: getLineId(), text: "Workspace Shell Commands:", type: "system" },
+        { id: getLineId(), text: "  ls [path]         List directory contents", type: "stdout" },
+        { id: getLineId(), text: "  cd <dir>          Change directory (e.g. cd src)", type: "stdout" },
+        { id: getLineId(), text: "  pwd               Print current working directory", type: "stdout" },
+        { id: getLineId(), text: "  cat <file>        Display file contents", type: "stdout" },
+        { id: getLineId(), text: "  touch <file>      Create a new file in workspace", type: "stdout" },
+        { id: getLineId(), text: "  mkdir <dir>       Create a new folder in workspace", type: "stdout" },
+        { id: getLineId(), text: "  rm <file>         Delete a file or folder", type: "stdout" },
+        { id: getLineId(), text: "  node -v / node    Run Node.js commands", type: "stdout" },
+        { id: getLineId(), text: "  whoami            Show current authenticated user", type: "stdout" },
+        { id: getLineId(), text: "  clear             Clear terminal screen", type: "stdout" },
+      ]);
+      return;
+    }
+
+    setIsExecuting(true);
+
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(project.id)}/terminal`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          command: cmd,
+          cwd: currentCwd,
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        setTerminalLines((prev) => [
+          ...prev,
+          {
+            id: getLineId(),
+            text: errorData.error || `Process failed with HTTP ${res.status}`,
+            type: "stderr",
+          },
+        ]);
+        return;
+      }
+
+      const data = await res.json();
+
+      // Update cwd if changed
+      if (typeof data.cwd === "string") {
+        setCurrentCwd(data.cwd);
+      }
+
+      const newOutputLines: TerminalLine[] = [];
+
+      if (data.stdout) {
+        const lines = data.stdout.split(/\r?\n/);
+        // Remove trailing empty element if newline terminated
+        if (lines[lines.length - 1] === "") lines.pop();
+        for (const line of lines) {
+          newOutputLines.push({
+            id: getLineId(),
+            text: line,
+            type: "stdout",
+          });
+        }
+      }
+
+      if (data.stderr) {
+        const lines = data.stderr.split(/\r?\n/);
+        if (lines[lines.length - 1] === "") lines.pop();
+        for (const line of lines) {
+          newOutputLines.push({
+            id: getLineId(),
+            text: line,
+            type: "stderr",
+          });
+        }
+      }
+
+      if (newOutputLines.length > 0) {
+        setTerminalLines((prev) => [...prev, ...newOutputLines]);
+      }
+
+      // If command modified the filesystem, sync files to UI state
+      if (data.updatedFiles && Array.isArray(data.updatedFiles) && onFilesSynced) {
+        onFilesSynced(data.updatedFiles);
+      }
+    } catch (err) {
+      setTerminalLines((prev) => [
+        ...prev,
+        {
+          id: getLineId(),
+          text: `Command error: ${err instanceof Error ? err.message : "Network failure"}`,
+          type: "stderr",
+        },
+      ]);
+    } finally {
+      setIsExecuting(false);
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
   };
 
   if (!isOpen) return null;
@@ -233,6 +241,7 @@ export default function TerminalPanel({
           >
             <TerminalIcon className="w-3.5 h-3.5" />
             <span>Terminal</span>
+            {isExecuting && <Loader2 className="w-3 h-3 animate-spin text-amber-400 ml-1" />}
           </button>
 
           <button
@@ -263,7 +272,7 @@ export default function TerminalPanel({
             }`}
           >
             <AlertCircle className="w-3.5 h-3.5" />
-            <span>Problems (0)</span>
+            <span>Problems</span>
           </button>
         </div>
 
@@ -274,7 +283,7 @@ export default function TerminalPanel({
               type="button"
               onClick={onClearConsole}
               title="Clear output console"
-              className="p-1 hover:text-white rounded hover:bg-[#333333] transition"
+              className="p-1 hover:text-white rounded hover:bg-[#333333] transition cursor-pointer"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
@@ -282,9 +291,9 @@ export default function TerminalPanel({
           {activeTab === "terminal" && (
             <button
               type="button"
-              onClick={() => setTerminalHistory([])}
+              onClick={() => setTerminalLines([])}
               title="Clear terminal"
-              className="p-1 hover:text-white rounded hover:bg-[#333333] transition"
+              className="p-1 hover:text-white rounded hover:bg-[#333333] transition cursor-pointer"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
@@ -293,7 +302,7 @@ export default function TerminalPanel({
             type="button"
             onClick={onToggle}
             title="Close panel"
-            className="p-1 hover:text-white rounded hover:bg-[#333333] transition"
+            className="p-1 hover:text-white rounded hover:bg-[#333333] transition cursor-pointer"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -308,35 +317,43 @@ export default function TerminalPanel({
             className="h-full flex flex-col cursor-text"
             onClick={() => inputRef.current?.focus()}
           >
-            <div className="space-y-0.5 leading-relaxed">
-              {terminalHistory.map((line, idx) => (
+            <div className="space-y-0.5 leading-relaxed font-mono">
+              {terminalLines.map((line) => (
                 <div
-                  key={idx}
+                  key={line.id}
                   className={
-                    line.startsWith("✓")
+                    line.type === "command"
+                      ? "text-cyan-300 font-semibold"
+                      : line.type === "stderr"
+                      ? "text-rose-400 whitespace-pre-wrap break-all"
+                      : line.type === "system"
+                      ? "text-neutral-400 italic"
+                      : line.type === "success"
                       ? "text-emerald-400"
-                      : line.startsWith("bash:")
-                      ? "text-rose-400"
-                      : line.startsWith("~/")
-                      ? "text-cyan-300"
-                      : ""
+                      : "text-neutral-200 whitespace-pre-wrap break-all"
                   }
                 >
-                  {line}
+                  {line.text}
                 </div>
               ))}
             </div>
 
             {/* Prompt input row */}
             <form onSubmit={handleCommandSubmit} className="flex items-center gap-2 mt-1">
-              <span className="text-emerald-400 font-semibold shrink-0">~/project $</span>
+              <span className="text-emerald-400 font-semibold shrink-0 select-none">
+                {promptPrefix}
+              </span>
               <input
                 ref={inputRef}
                 type="text"
+                disabled={isExecuting}
                 value={currentInput}
                 onChange={(e) => setCurrentInput(e.target.value)}
-                className="bg-transparent text-white outline-none flex-1 font-mono text-xs border-none p-0"
+                onKeyDown={handleKeyDown}
+                className="bg-transparent text-white outline-none flex-1 font-mono text-xs border-none p-0 disabled:opacity-50"
                 autoFocus
+                spellCheck={false}
+                autoComplete="off"
               />
             </form>
             <div ref={endRef} />
@@ -380,7 +397,7 @@ export default function TerminalPanel({
         {activeTab === "problems" && (
           <div className="flex items-center gap-2 text-neutral-400 py-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            <span>No syntax errors, build issues, or type diagnostics detected in workspace.</span>
+            <span>Workspace is healthy. No unresolved compiler errors or diagnostics detected.</span>
           </div>
         )}
       </div>

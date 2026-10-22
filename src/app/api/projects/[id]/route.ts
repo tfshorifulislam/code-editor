@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { getProjectById, updateProjectMetadata, deleteProject } from "@/lib/server/projectService";
+import { ensureWorkspaceOnDisk } from "@/lib/server/workspaceDisk";
 
 interface RouteProps {
   params: Promise<{ id: string }>;
@@ -17,6 +18,13 @@ export async function GET(req: Request, { params }: RouteProps) {
     const project = await getProjectById(id, user.id);
     if (!project) {
       return NextResponse.json({ error: "Project not found or unauthorized." }, { status: 404 });
+    }
+
+    // Ensure the physical workspace on disk is initialized and synchronized
+    try {
+      await ensureWorkspaceOnDisk(project);
+    } catch (diskErr) {
+      console.warn("Could not synchronize workspace to disk:", diskErr);
     }
 
     return NextResponse.json({ project });

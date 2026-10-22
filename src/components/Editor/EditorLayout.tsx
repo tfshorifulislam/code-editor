@@ -281,6 +281,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
     performCloudSave(activeFile.id, activeFile.content, activeFile.version);
+    setPreviewRefreshKey((k) => k + 1);
     setConsoleMessages((prev) => [
       ...prev,
       {
@@ -537,12 +538,23 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
     ]);
   };
 
-  const handleRunPreview = useCallback(() => {
-    setIsPreviewOpen((prev) => {
-      if (!prev) return true;
-      setPreviewRefreshKey((k) => k + 1);
-      return true;
+  const handleFilesSynced = useCallback((updatedFiles: ProjectFile[]) => {
+    setActiveProject((prev) => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        files: updatedFiles,
+        updatedAt: getTimestamp(),
+      };
     });
+  }, []);
+
+  const handleRunPreview = useCallback(() => {
+    if (activeFile && unsavedFiles[activeFile.id]) {
+      handleSaveActiveFile();
+    }
+    setIsPreviewOpen(true);
+    setPreviewRefreshKey((k) => k + 1);
     setConsoleMessages((prev) => [
       ...prev,
       {
@@ -552,7 +564,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
         timestamp: getTimestamp(),
       },
     ]);
-  }, []);
+  }, [activeFile, unsavedFiles, handleSaveActiveFile]);
 
   // Global Keyboard Shortcuts
   useEffect(() => {
@@ -1018,6 +1030,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
             consoleMessages={consoleMessages}
             onClearConsole={() => setConsoleMessages([])}
             project={activeProject}
+            onFilesSynced={handleFilesSynced}
           />
         </main>
 

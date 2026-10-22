@@ -7,6 +7,11 @@ import {
   generateNextJsProjectFiles,
   getFilesForFrameworkInit,
 } from "./frameworkEngine";
+import {
+  writeProjectFileToDisk,
+  deleteProjectFileFromDisk,
+  renameProjectFileOnDisk,
+} from "./workspaceDisk";
 import crypto from "crypto";
 
 interface ScaffoldingFile {
@@ -384,6 +389,11 @@ export async function createProjectFile(
     }),
   ]);
 
+  // Synchronize to physical workspace on disk
+  await writeProjectFileToDisk(projectId, newFile.path, newFile.content, newFile.isFolder).catch((err) =>
+    console.error("Failed to write created file to disk:", err)
+  );
+
   return newFile;
 }
 
@@ -432,6 +442,11 @@ export async function updateProjectFileContent(
       data: { updatedAt: new Date() },
     }),
   ]);
+
+  // Synchronize saved content to physical workspace on disk
+  await writeProjectFileToDisk(projectId, updatedFile.path, updatedFile.content, false).catch((err) =>
+    console.error("Failed to write updated file to disk:", err)
+  );
 
   return { file: updatedFile, status: 200 };
 }
@@ -504,6 +519,11 @@ export async function renameProjectFile(
     ]);
   }
 
+  // Synchronize rename on disk
+  await renameProjectFileOnDisk(projectId, file.path, newPath).catch((err) =>
+    console.error("Failed to rename file on disk:", err)
+  );
+
   return prisma.projectFile.findUnique({ where: { id: fileId } });
 }
 
@@ -551,6 +571,11 @@ export async function deleteProjectFile(
       }),
     ]);
   }
+
+  // Synchronize deletion on disk
+  await deleteProjectFileFromDisk(projectId, file.path).catch((err) =>
+    console.error("Failed to delete file from disk:", err)
+  );
 
   return { success: true };
 }
