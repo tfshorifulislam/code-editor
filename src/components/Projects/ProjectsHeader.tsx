@@ -6,6 +6,7 @@ import {
   LayoutGrid,
   List,
   Plus,
+  Upload,
   SlidersHorizontal,
   X,
 } from "lucide-react";
@@ -22,6 +23,7 @@ interface ProjectsHeaderProps {
   sortBy: "modified" | "name" | "created";
   onSortChange: (sort: "modified" | "name" | "created") => void;
   onOpenNewProject: () => void;
+  onOpenImportProject?: () => void;
 }
 
 export default function ProjectsHeader({
@@ -35,6 +37,7 @@ export default function ProjectsHeader({
   sortBy,
   onSortChange,
   onOpenNewProject,
+  onOpenImportProject,
 }: ProjectsHeaderProps) {
   const getCategoryTitle = () => {
     switch (category) {
@@ -81,14 +84,26 @@ export default function ProjectsHeader({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={onOpenNewProject}
-          className="inline-flex items-center justify-center gap-2 py-2 px-4 rounded-xl bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white text-xs sm:text-sm font-semibold shadow-xs transition cursor-pointer self-start sm:self-auto shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>New Project</span>
-        </button>
+        <div className="flex items-center gap-2.5 self-start sm:self-auto shrink-0">
+          {onOpenImportProject && (
+            <button
+              type="button"
+              onClick={onOpenImportProject}
+              className="inline-flex items-center justify-center gap-2 py-2 px-3.5 rounded-xl border border-[#eaeaea] hover:bg-neutral-50 text-neutral-700 text-xs sm:text-sm font-semibold shadow-2xs transition cursor-pointer"
+            >
+              <Upload className="w-4 h-4 text-[var(--color-primary)]" />
+              <span>Import Project</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onOpenNewProject}
+            className="inline-flex items-center justify-center gap-2 py-2 px-4 rounded-xl bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white text-xs sm:text-sm font-semibold shadow-xs transition cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>New Project</span>
+          </button>
+        </div>
       </div>
 
       {/* Controls Row: Search + Filters + Sort + View Mode */}

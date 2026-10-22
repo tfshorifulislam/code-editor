@@ -21,6 +21,9 @@ export interface ProjectFile {
   isFolder: boolean;
   parentId: string | null;
   version?: number;
+  size?: number;
+  mimeType?: string;
+  isBinary?: boolean;
 }
 
 export type ProjectTemplate =
@@ -163,7 +166,32 @@ export interface ExtensionItem {
   downloads: string;
   rating: number;
   installed: boolean;
-  category: "Language" | "Themes" | "Linters" | "Formatters" | "Tools";
+  enabled?: boolean;
+  category: "Language" | "Themes" | "Linters" | "Formatters" | "Tools" | "Other";
+  iconUrl?: string;
+  license?: string;
+  repository?: string;
+  tags?: string[];
+  settings?: Record<string, unknown>;
+  requiresContainerRuntime?: boolean;
+}
+
+export interface ProjectImportFile {
+  name: string;
+  path: string;
+  content: string;
+  isFolder: boolean;
+  isBinary?: boolean;
+  size?: number;
+  mimeType?: string;
+}
+
+export interface ProjectImportPayload {
+  name: string;
+  description?: string;
+  isPrivate?: boolean;
+  detectedTemplate?: ProjectTemplate;
+  files: ProjectImportFile[];
 }
 
 export interface WorkspaceContainerConfig {

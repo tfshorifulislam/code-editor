@@ -405,6 +405,79 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
     }
   };
 
+  const handleUploadFiles = async (files: FileList | File[], targetFolderId: string | null = null) => {
+    if (!activeProject || files.length === 0) return;
+
+    let targetFolderPath = "";
+    if (targetFolderId) {
+      const folder = activeProject.files.find((f) => f.id === targetFolderId && f.isFolder);
+      if (folder) {
+        targetFolderPath = folder.path;
+      }
+    }
+
+    const fileList = Array.from(files);
+
+    try {
+      setConsoleMessages((prev) => [
+        ...prev,
+        {
+          id: getEditorUniqueId("up"),
+          type: "info",
+          content: `Uploading ${fileList.length} file(s) into workspace...`,
+          timestamp: getTimestamp(),
+        },
+      ]);
+
+      const uploadedFiles = await cloudApi.files.upload(activeProject.id, fileList, targetFolderPath);
+
+      if (uploadedFiles && uploadedFiles.length > 0) {
+        setActiveProject((prev) => {
+          if (!prev) return null;
+          const map = new Map<string, ProjectFile>();
+          for (const f of prev.files) map.set(f.path, f);
+          for (const u of uploadedFiles) map.set(u.path, u);
+          const nextFiles = Array.from(map.values());
+
+          const first = uploadedFiles[0];
+          const nextOpen =
+            first && !first.isFolder && !prev.openFileIds.includes(first.id)
+              ? [...prev.openFileIds, first.id]
+              : prev.openFileIds;
+
+          return {
+            ...prev,
+            files: nextFiles,
+            openFileIds: nextOpen,
+            activeFileId: first ? first.id : prev.activeFileId,
+            updatedAt: getTimestamp(),
+          };
+        });
+
+        setConsoleMessages((prev) => [
+          ...prev,
+          {
+            id: getEditorUniqueId("up_done"),
+            type: "info",
+            content: `✓ Successfully uploaded ${uploadedFiles.length} file(s) to cloud workspace.`,
+            timestamp: getTimestamp(),
+          },
+        ]);
+      }
+    } catch (err) {
+      console.error("Upload error:", err);
+      setConsoleMessages((prev) => [
+        ...prev,
+        {
+          id: getEditorUniqueId("up_err"),
+          type: "error",
+          content: `Failed to upload files: ${err instanceof Error ? err.message : "Network/server error"}`,
+          timestamp: getTimestamp(),
+        },
+      ]);
+    }
+  };
+
   const handleApplyDiff = (fileId: string, newContent: string) => {
     if (!activeProject) return;
     const targetFile = activeProject.files.find((f) => f.id === fileId);
@@ -743,6 +816,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
                 onDeleteFile={handleDeleteFile}
                 onResetProject={handleResetProject}
                 onOpenInitializeProject={() => setIsInitializeDialogOpen(true)}
+                onUploadFiles={handleUploadFiles}
               />
             )}
 

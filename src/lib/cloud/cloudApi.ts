@@ -190,6 +190,31 @@ export const cloudApi = {
       const res = await fetch("/api/projects/trash/empty", { method: "POST" });
       if (!res.ok) throw new Error("Failed to empty trash.");
     },
+
+    async importArchive(formData: FormData): Promise<{ project: Project; detection: unknown }> {
+      const res = await fetch("/api/projects/import", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to import project.");
+      return data;
+    },
+
+    async importFiles(payload: {
+      name: string;
+      description?: string;
+      files: import("@/types/editor").ProjectImportFile[];
+    }): Promise<{ project: Project; detection: unknown }> {
+      const res = await fetch("/api/projects/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to import project.");
+      return data;
+    },
   },
 
   files: {
@@ -249,6 +274,25 @@ export const cloudApi = {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("Failed to delete file from cloud.");
+    },
+
+    async upload(
+      projectId: string,
+      files: File[],
+      folderPath?: string
+    ): Promise<ProjectFile[]> {
+      const formData = new FormData();
+      if (folderPath) formData.append("folder", folderPath);
+      for (const file of files) {
+        formData.append("files", file);
+      }
+      const res = await fetch(`/api/projects/${projectId}/upload`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to upload files.");
+      return data.files || [];
     },
   },
 };

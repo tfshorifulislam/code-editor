@@ -6,6 +6,7 @@ import type { OnMount } from "@monaco-editor/react";
 import type * as Monaco from "monaco-editor";
 import { ProjectFile, EditorSettings, Project } from "@/types/editor";
 import { configureMonacoTypeScript } from "@/lib/monaco/typescriptService";
+import ImagePreviewer, { isImageFile } from "./ImagePreviewer";
 
 // Dynamically import Editor to completely eliminate SSR issues
 const Editor = dynamic(() => import("@monaco-editor/react"), {
@@ -107,6 +108,11 @@ export default function MonacoEditorComponent({
         </p>
       </div>
     );
+  }
+
+  // Handle binary and vector images with dedicated previewer
+  if (isImageFile(activeFile)) {
+    return <ImagePreviewer key={activeFile.id} activeFile={activeFile} project={project} />;
   }
 
   // Determine language mode

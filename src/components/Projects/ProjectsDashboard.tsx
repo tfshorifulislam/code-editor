@@ -5,6 +5,7 @@ import ProjectsSidebar, { DashboardViewCategory } from "./ProjectsSidebar";
 import ProjectsHeader from "./ProjectsHeader";
 import ProjectCard from "./ProjectCard";
 import NewProjectDialog from "./NewProjectDialog";
+import ImportProjectDialog from "./ImportProjectDialog";
 import ProjectEmptyState from "./ProjectEmptyState";
 import { Project, ProjectTemplate } from "@/types/editor";
 import { cloudApi } from "@/lib/cloud/cloudApi";
@@ -37,6 +38,7 @@ export default function ProjectsDashboard() {
   const [filterType, setFilterType] = useState("all");
   const [sortBy, setSortBy] = useState<"modified" | "name" | "created">("modified");
   const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
+  const [isImportProjectOpen, setIsImportProjectOpen] = useState(false);
 
   // Rename modal state
   const [renamingProject, setRenamingProject] = useState<{ id: string; name: string } | null>(null);
@@ -338,6 +340,7 @@ export default function ProjectsDashboard() {
           sortBy={sortBy}
           onSortChange={setSortBy}
           onOpenNewProject={() => setIsNewProjectOpen(true)}
+          onOpenImportProject={() => setIsImportProjectOpen(true)}
         />
 
         {/* Content Container */}
@@ -489,6 +492,16 @@ export default function ProjectsDashboard() {
         isOpen={isNewProjectOpen}
         onClose={() => setIsNewProjectOpen(false)}
         onCreated={(id) => {
+          fetchCloudProjects();
+          router.push(`/editor/${id}`);
+        }}
+      />
+
+      {/* Import Existing Project Modal */}
+      <ImportProjectDialog
+        isOpen={isImportProjectOpen}
+        onClose={() => setIsImportProjectOpen(false)}
+        onImported={(id) => {
           fetchCloudProjects();
           router.push(`/editor/${id}`);
         }}
