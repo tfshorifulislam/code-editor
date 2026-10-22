@@ -17,15 +17,24 @@ export interface ProjectFile {
   parentId: string | null;
 }
 
-export type ProjectTemplate = "react-ts" | "vanilla-web" | "html-css";
+export type ProjectTemplate =
+  | "react-ts"
+  | "vanilla-web"
+  | "next-app"
+  | "node-api"
+  | "blank";
 
 export interface Project {
   id: string;
   name: string;
   template: ProjectTemplate;
+  description?: string;
   files: ProjectFile[];
   activeFileId: string | null;
   openFileIds: string[];
+  starred?: boolean;
+  isTrash?: boolean;
+  trashedAt?: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -72,4 +81,3 @@ export type SidebarView =
   | "settings";
 
 export type BottomTab = "terminal" | "output" | "problems";
-

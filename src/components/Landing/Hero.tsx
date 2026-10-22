@@ -42,7 +42,7 @@ export default function Hero() {
             {/* CTA Buttons */}
             <div className="mt-6 sm:mt-7 flex flex-col sm:flex-row items-center gap-3 sm:gap-3.5 w-full sm:w-auto justify-center lg:justify-start">
               <Link
-                href="/editor"
+                href="/projects"
                 className="group landing-button-primary w-full sm:w-auto h-11 sm:h-12 px-6 shadow-md hover:shadow-lg shadow-[var(--color-primary)]/20"
               >
                 <span>Start Coding Free</span>

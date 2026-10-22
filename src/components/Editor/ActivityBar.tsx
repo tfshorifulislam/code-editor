@@ -61,10 +61,10 @@ export default function ActivityBar({
     <aside className="w-12 bg-[#181818] border-r border-[#2b2b2b] flex flex-col justify-between items-center py-2 select-none z-30 shrink-0">
       {/* Top Section */}
       <div className="flex flex-col items-center gap-1 w-full">
-        {/* Brand Home Icon */}
+        {/* Brand Home / Projects Dashboard Icon */}
         <Link
-          href="/"
-          title="Back to Landing Page"
+          href="/projects"
+          title="Back to Projects Dashboard"
           className="w-10 h-10 rounded-lg flex items-center justify-center text-white hover:bg-[#2a2a2a] mb-2 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-primary)]"
         >
           <div className="w-6 h-6 rounded bg-[var(--color-primary)] flex items-center justify-center text-white">

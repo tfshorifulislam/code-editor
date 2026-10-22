@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import ActivityBar from "./ActivityBar";
 import FileExplorer from "./FileExplorer";
 import EditorTabs from "./EditorTabs";
@@ -43,6 +44,7 @@ import {
   Moon,
   Sun,
   X,
+  ArrowLeft,
 } from "lucide-react";
 
 let layoutCounter = 1000;
@@ -54,7 +56,11 @@ function getTimestamp(): number {
   return 1700000000000 + layoutCounter;
 }
 
-export default function EditorLayout() {
+interface EditorLayoutProps {
+  initialProjectId?: string;
+}
+
+export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
   // 1. Projects & active project state with lazy initializer
   const [projects, setProjects] = useState<Project[]>(() => {
     if (typeof window !== "undefined") {
@@ -71,6 +77,13 @@ export default function EditorLayout() {
   const [activeProject, setActiveProject] = useState<Project | null>(() => {
     if (typeof window !== "undefined") {
       const existing = loadProjects();
+      if (initialProjectId) {
+        const found = existing.find((p) => p.id === initialProjectId);
+        if (found) {
+          saveActiveProjectId(found.id);
+          return found;
+        }
+      }
       const activeId = loadActiveProjectId();
       if (existing.length > 0) {
         return existing.find((p) => p.id === activeId) || existing[0];
@@ -432,7 +445,16 @@ export default function EditorLayout() {
     <div className="h-screen w-screen flex flex-col bg-[#1e1e1e] text-neutral-300 font-sans overflow-hidden select-none">
       {/* Top Application Header Bar */}
       <header className="h-9 bg-[#1f1f1f] border-b border-[#2b2b2b] px-3 flex items-center justify-between text-xs select-none shrink-0 z-30">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
+          <Link
+            href="/projects"
+            className="flex items-center gap-1.5 text-neutral-400 hover:text-white px-2 py-0.5 rounded hover:bg-[#2b2b2b] transition font-medium"
+            title="Return to Projects Dashboard"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">Projects</span>
+          </Link>
+          <span className="text-neutral-600">/</span>
           <span className="font-semibold text-white tracking-tight flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-[var(--color-primary)]" />
             Code Editor

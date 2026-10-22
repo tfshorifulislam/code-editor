@@ -34,7 +34,7 @@ export default function FinalCTA() {
 
             <div className="pt-2 sm:pt-3 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
               <Link
-                href="/editor"
+                href="/projects"
                 className="landing-button-primary w-full sm:w-auto text-base !py-3 !px-7"
               >
                 <span>Start Coding Free</span>

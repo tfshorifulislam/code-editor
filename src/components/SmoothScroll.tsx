@@ -34,9 +34,13 @@ export default function SmoothScroll({ children }: SmoothScrollProps) {
     getReducedMotionServerSnapshot
   );
 
-  // When reduced motion is preferred or inside the /editor route,
-  // use native browser scrolling without animation so IDE panels and Monaco operate smoothly.
-  if (isReducedMotion || pathname?.startsWith("/editor")) {
+  // When reduced motion is preferred or inside app routes (/editor or /projects),
+  // use native browser scrolling without animation so IDE panels, project grids, and Monaco operate smoothly.
+  if (
+    isReducedMotion ||
+    pathname?.startsWith("/editor") ||
+    pathname?.startsWith("/projects")
+  ) {
     return <>{children}</>;
   }
 

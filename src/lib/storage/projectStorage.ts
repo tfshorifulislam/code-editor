@@ -9,6 +9,7 @@ export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   tabSize: 2,
 };
 
+// 1. React + TypeScript Template
 export const STARTER_REACT_TS_FILES: ProjectFile[] = [
   {
     id: "f-root-src",
@@ -28,9 +29,9 @@ export const STARTER_REACT_TS_FILES: ProjectFile[] = [
 export default function App() {
   const [count, setCount] = useState(0);
   const [todos, setTodos] = useState([
-    { id: 1, text: "Build with Code Editor", done: true },
-    { id: 2, text: "Explore AI Assistant features", done: false },
-    { id: 3, text: "Deploy modern web app", done: false },
+    { id: 1, text: "Explore Code Editor workspace", done: true },
+    { id: 2, text: "Try the AI Coding Assistant", done: false },
+    { id: 3, text: "Inspect live web preview", done: false },
   ]);
   const [newTodo, setNewTodo] = useState("");
 
@@ -39,7 +40,7 @@ export default function App() {
     if (!newTodo.trim()) return;
     setTodos([...todos, { id: Date.now(), text: newTodo.trim(), done: false }]);
     setNewTodo("");
-    console.log("Added new task:", newTodo);
+    console.log("Added task:", newTodo);
   };
 
   const toggleTodo = (id: number) => {
@@ -144,25 +145,9 @@ if (rootElement) {
     id: "f-styles-css",
     name: "styles.css",
     path: "src/styles.css",
-    content: `/* Global styles */
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  padding: 0;
-  background-color: #f8fafc;
-  color: #1e293b;
-  -webkit-font-smoothing: antialiased;
-}
-
-code {
-  background: #f1f5f9;
-  padding: 0.15rem 0.35rem;
-  border-radius: 4px;
-  font-family: monospace;
-}`,
+    content: `* { box-sizing: border-box; }
+body { margin: 0; padding: 0; background-color: #f8fafc; color: #1e293b; font-family: system-ui, sans-serif; }
+code { background: #f1f5f9; padding: 0.15rem 0.35rem; border-radius: 4px; font-family: monospace; }`,
     language: "css",
     isFolder: false,
     parentId: "f-root-src",
@@ -197,10 +182,6 @@ code {
   "dependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
-  },
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build"
   }
 }`,
     language: "json",
@@ -209,6 +190,7 @@ code {
   },
 ];
 
+// 2. Vanilla Web (HTML, CSS, JS) Template
 export const STARTER_VANILLA_FILES: ProjectFile[] = [
   {
     id: "v-index-html",
@@ -235,8 +217,8 @@ export const STARTER_VANILLA_FILES: ProjectFile[] = [
     </div>
 
     <div class="input-row">
-      <input type="text" id="log-input" placeholder="Type a message for the console...">
-      <button id="btn-log">Send to Console</button>
+      <input type="text" id="log-input" placeholder="Type a message for console...">
+      <button id="btn-log">Log</button>
     </div>
   </div>
 
@@ -261,7 +243,6 @@ export const STARTER_VANILLA_FILES: ProjectFile[] = [
   margin: 0;
   padding: 1rem;
 }
-
 .card {
   background: white;
   padding: 2.5rem;
@@ -271,7 +252,6 @@ export const STARTER_VANILLA_FILES: ProjectFile[] = [
   width: 100%;
   text-align: center;
 }
-
 .badge {
   display: inline-block;
   background: #f3f0ff;
@@ -282,69 +262,14 @@ export const STARTER_VANILLA_FILES: ProjectFile[] = [
   font-weight: 600;
   margin-bottom: 1rem;
 }
-
-h1 {
-  font-size: 1.8rem;
-  margin: 0 0 0.5rem 0;
-  color: #1a1a1a;
-}
-
-p {
-  color: #666;
-  font-size: 0.95rem;
-  line-height: 1.5;
-  margin-bottom: 1.8rem;
-}
-
-.counter-box {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1.2rem;
-  margin-bottom: 1.5rem;
-}
-
-button {
-  background: #6c5ce7;
-  color: white;
-  border: none;
-  padding: 0.6rem 1.2rem;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.2s;
-}
-
-button:hover {
-  opacity: 0.9;
-}
-
-#btn-minus {
-  background: #e2e8f0;
-  color: #1e293b;
-}
-
-#counter-value {
-  font-size: 1.8rem;
-  font-weight: 700;
-  min-width: 2.5rem;
-}
-
-.input-row {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 1rem;
-}
-
-input {
-  flex: 1;
-  padding: 0.6rem;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  outline: none;
-}`,
+h1 { font-size: 1.8rem; margin: 0 0 0.5rem 0; color: #1a1a1a; }
+p { color: #666; font-size: 0.95rem; line-height: 1.5; margin-bottom: 1.8rem; }
+.counter-box { display: flex; align-items: center; justify-content: center; gap: 1.2rem; margin-bottom: 1.5rem; }
+button { background: #6c5ce7; color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; }
+#btn-minus { background: #e2e8f0; color: #1e293b; }
+#counter-value { font-size: 1.8rem; font-weight: 700; min-width: 2.5rem; }
+.input-row { display: flex; gap: 0.5rem; margin-top: 1rem; }
+input { flex: 1; padding: 0.6rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem; outline: none; }`,
     language: "css",
     isFolder: false,
     parentId: null,
@@ -353,35 +278,34 @@ input {
     id: "v-app-js",
     name: "app.js",
     path: "app.js",
-    content: `// Client-side interactions
-let count = 0;
+    content: `let count = 0;
 const counterVal = document.getElementById("counter-value");
 const btnPlus = document.getElementById("btn-plus");
 const btnMinus = document.getElementById("btn-minus");
 const btnLog = document.getElementById("btn-log");
 const logInput = document.getElementById("log-input");
 
-btnPlus.addEventListener("click", () => {
+btnPlus?.addEventListener("click", () => {
   count++;
-  counterVal.textContent = count;
-  console.log("Count incremented to:", count);
+  if (counterVal) counterVal.textContent = count;
+  console.log("Count:", count);
 });
 
-btnMinus.addEventListener("click", () => {
+btnMinus?.addEventListener("click", () => {
   count--;
-  counterVal.textContent = count;
-  console.log("Count decremented to:", count);
+  if (counterVal) counterVal.textContent = count;
+  console.log("Count:", count);
 });
 
-btnLog.addEventListener("click", () => {
-  const msg = logInput.value.trim();
+btnLog?.addEventListener("click", () => {
+  const msg = logInput?.value.trim();
   if (msg) {
     console.log("[User Log]:", msg);
     logInput.value = "";
   }
 });
 
-console.log("Application initialized successfully in browser workspace!");`,
+console.log("Vanilla Web project ready!");`,
     language: "javascript",
     isFolder: false,
     parentId: null,
@@ -390,48 +314,258 @@ console.log("Application initialized successfully in browser workspace!");`,
     id: "v-readme-md",
     name: "README.md",
     path: "README.md",
-    content: `# Modern Web App Starter
-
-This project demonstrates live web development in Code Editor.
-
-## How to use:
-1. Edit \`index.html\`, \`styles.css\`, or \`app.js\`.
-2. Notice real-time live preview on the right.
-3. Open the Terminal/Output drawer to inspect \`console.log\` output.
-4. Use the AI Assistant to ask questions, refactor, or generate code.
-`,
+    content: `# Vanilla Web Project\n\nEdit \`index.html\`, \`styles.css\`, and \`app.js\` to build lightweight web apps.`,
     language: "markdown",
     isFolder: false,
     parentId: null,
   },
 ];
 
+// 3. Next.js Web App Template
+export const STARTER_NEXT_FILES: ProjectFile[] = [
+  {
+    id: "n-app-folder",
+    name: "app",
+    path: "app",
+    content: "",
+    language: "",
+    isFolder: true,
+    parentId: null,
+  },
+  {
+    id: "n-page-tsx",
+    name: "page.tsx",
+    path: "app/page.tsx",
+    content: `export default function Page() {
+  return (
+    <main style={{ padding: "3rem", fontFamily: "system-ui, sans-serif", maxWidth: "800px", margin: "0 auto" }}>
+      <div style={{ display: "inline-block", background: "#f3f0ff", color: "#6c5ce7", padding: "0.3rem 0.8rem", borderRadius: "9999px", fontSize: "0.85rem", fontWeight: 600 }}>
+        Next.js App Router
+      </div>
+      <h1 style={{ fontSize: "2.5rem", fontWeight: 800, marginTop: "1rem", color: "#111827" }}>
+        Modern Fullstack Project
+      </h1>
+      <p style={{ color: "#4b5563", fontSize: "1.1rem", lineHeight: 1.6 }}>
+        Build server-rendered pages and API endpoints with Next.js architecture.
+      </p>
+    </main>
+  );
+}`,
+    language: "typescript",
+    isFolder: false,
+    parentId: "n-app-folder",
+  },
+  {
+    id: "n-layout-tsx",
+    name: "layout.tsx",
+    path: "app/layout.tsx",
+    content: `export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body style={{ margin: 0, background: "#ffffff" }}>
+        {children}
+      </body>
+    </html>
+  );
+}`,
+    language: "typescript",
+    isFolder: false,
+    parentId: "n-app-folder",
+  },
+  {
+    id: "n-package-json",
+    name: "package.json",
+    path: "package.json",
+    content: `{\n  "name": "nextjs-web-app",\n  "version": "1.0.0",\n  "dependencies": {\n    "next": "^15.0.0",\n    "react": "^19.0.0",\n    "react-dom": "^19.0.0"\n  }\n}`,
+    language: "json",
+    isFolder: false,
+    parentId: null,
+  },
+  {
+    id: "n-readme-md",
+    name: "README.md",
+    path: "README.md",
+    content: `# Next.js Starter\n\nNext.js App Router project template.`,
+    language: "markdown",
+    isFolder: false,
+    parentId: null,
+  },
+];
+
+// 4. Node.js API Service Template
+export const STARTER_NODE_FILES: ProjectFile[] = [
+  {
+    id: "node-server-js",
+    name: "server.js",
+    path: "server.js",
+    content: `// Node.js REST API Server
+const http = require("http");
+
+const users = [
+  { id: 1, name: "Alice Developer", role: "Frontend Engineer" },
+  { id: 2, name: "Bob Designer", role: "UI/UX Product Designer" },
+];
+
+const server = http.createServer((req, res) => {
+  res.setHeader("Content-Type", "application/json");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+
+  if (req.url === "/api/health") {
+    res.writeHead(200);
+    return res.end(JSON.stringify({ status: "ok", timestamp: Date.now() }));
+  }
+
+  if (req.url === "/api/users") {
+    res.writeHead(200);
+    return res.end(JSON.stringify({ data: users }));
+  }
+
+  res.writeHead(404);
+  res.end(JSON.stringify({ error: "Route not found" }));
+});
+
+const PORT = 3001;
+server.listen(PORT, () => {
+  console.log(\`Server listening on http://localhost:\${PORT}\`);
+});`,
+    language: "javascript",
+    isFolder: false,
+    parentId: null,
+  },
+  {
+    id: "node-package-json",
+    name: "package.json",
+    path: "package.json",
+    content: `{\n  "name": "node-microservice",\n  "version": "1.0.0",\n  "main": "server.js",\n  "scripts": { "start": "node server.js" }\n}`,
+    language: "json",
+    isFolder: false,
+    parentId: null,
+  },
+  {
+    id: "node-readme-md",
+    name: "README.md",
+    path: "README.md",
+    content: `# Node.js API Service\n\nLightweight REST endpoints ready for API testing and backend development.`,
+    language: "markdown",
+    isFolder: false,
+    parentId: null,
+  },
+];
+
+// 5. Blank Project Template
+export const STARTER_BLANK_FILES: ProjectFile[] = [
+  {
+    id: "b-index-html",
+    name: "index.html",
+    path: "index.html",
+    content: `<!DOCTYPE html>\n<html>\n<head>\n  <meta charset="utf-8">\n  <title>Blank Project</title>\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n  <h1>Blank Project Ready</h1>\n  <p>Start writing your code here.</p>\n  <script src="main.js"></script>\n</body>\n</html>`,
+    language: "html",
+    isFolder: false,
+    parentId: null,
+  },
+  {
+    id: "b-style-css",
+    name: "style.css",
+    path: "style.css",
+    content: `body { font-family: sans-serif; padding: 2rem; }`,
+    language: "css",
+    isFolder: false,
+    parentId: null,
+  },
+  {
+    id: "b-main-js",
+    name: "main.js",
+    path: "main.js",
+    content: `console.log("Workspace initialized.");`,
+    language: "javascript",
+    isFolder: false,
+    parentId: null,
+  },
+  {
+    id: "b-readme-md",
+    name: "README.md",
+    path: "README.md",
+    content: `# Blank Project\n\nClean project scratchpad.`,
+    language: "markdown",
+    isFolder: false,
+    parentId: null,
+  },
+];
+
+export function getTemplateFiles(template: ProjectTemplate): {
+  files: ProjectFile[];
+  activeFileId: string;
+  openFileIds: string[];
+} {
+  switch (template) {
+    case "react-ts":
+      return {
+        files: STARTER_REACT_TS_FILES,
+        activeFileId: "f-app-tsx",
+        openFileIds: ["f-app-tsx", "f-styles-css", "f-package-json"],
+      };
+    case "vanilla-web":
+      return {
+        files: STARTER_VANILLA_FILES,
+        activeFileId: "v-index-html",
+        openFileIds: ["v-index-html", "v-styles-css", "v-app-js"],
+      };
+    case "next-app":
+      return {
+        files: STARTER_NEXT_FILES,
+        activeFileId: "n-page-tsx",
+        openFileIds: ["n-page-tsx", "n-layout-tsx", "n-package-json"],
+      };
+    case "node-api":
+      return {
+        files: STARTER_NODE_FILES,
+        activeFileId: "node-server-js",
+        openFileIds: ["node-server-js", "node-package-json", "node-readme-md"],
+      };
+    case "blank":
+    default:
+      return {
+        files: STARTER_BLANK_FILES,
+        activeFileId: "b-index-html",
+        openFileIds: ["b-index-html", "b-style-css", "b-main-js"],
+      };
+  }
+}
+
 export function createStarterProject(
   template: ProjectTemplate = "react-ts",
-  name?: string
+  name?: string,
+  description?: string
 ): Project {
-  const isReact = template === "react-ts";
-  const files = isReact ? STARTER_REACT_TS_FILES : STARTER_VANILLA_FILES;
-  const activeFileId = isReact ? "f-app-tsx" : "v-index-html";
-  const openFileIds = isReact
-    ? ["f-app-tsx", "f-styles-css", "f-package-json"]
-    : ["v-index-html", "v-styles-css", "v-app-js"];
+  const { files, activeFileId, openFileIds } = getTemplateFiles(template);
+  const now = Date.now();
+
+  const defaultNames: Record<ProjectTemplate, string> = {
+    "react-ts": "Interactive React App",
+    "vanilla-web": "Modern Web Application",
+    "next-app": "Next.js App Router Service",
+    "node-api": "Node.js REST API",
+    blank: "Blank Project Scratchpad",
+  };
 
   return {
-    id: `proj-${Date.now()}`,
-    name: name || (isReact ? "My React App" : "My Web Project"),
+    id: `proj-${now}-${Math.random().toString(36).slice(2, 7)}`,
+    name: name || defaultNames[template] || "New Project",
     template,
+    description: description || `Created with ${template} starter template.`,
     files,
     activeFileId,
     openFileIds,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
+    starred: false,
+    isTrash: false,
+    createdAt: now,
+    updatedAt: now,
   };
 }
 
-const STORAGE_KEY_PROJECTS = "code_editor_projects_v1";
-const STORAGE_KEY_ACTIVE_PROJECT = "code_editor_active_project_id_v1";
-const STORAGE_KEY_SETTINGS = "code_editor_settings_v1";
+const STORAGE_KEY_PROJECTS = "code_editor_projects_v2";
+const STORAGE_KEY_ACTIVE_PROJECT = "code_editor_active_project_id_v2";
+const STORAGE_KEY_SETTINGS = "code_editor_settings_v2";
 
 export function loadProjects(): Project[] {
   if (typeof window === "undefined") return [];
@@ -454,6 +588,11 @@ export function saveProjects(projects: Project[]): void {
   }
 }
 
+export function getProjectById(id: string): Project | undefined {
+  const all = loadProjects();
+  return all.find((p) => p.id === id);
+}
+
 export function loadActiveProjectId(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem(STORAGE_KEY_ACTIVE_PROJECT);
@@ -462,6 +601,89 @@ export function loadActiveProjectId(): string | null {
 export function saveActiveProjectId(id: string): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY_ACTIVE_PROJECT, id);
+}
+
+export function duplicateProject(id: string): Project | null {
+  const all = loadProjects();
+  const target = all.find((p) => p.id === id);
+  if (!target) return null;
+
+  const duplicated: Project = {
+    ...target,
+    id: `proj-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    name: `${target.name} (Copy)`,
+    starred: false,
+    isTrash: false,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  const next = [duplicated, ...all];
+  saveProjects(next);
+  return duplicated;
+}
+
+export function toggleStarProject(id: string): boolean {
+  const all = loadProjects();
+  let nextStarred = false;
+  const next = all.map((p) => {
+    if (p.id === id) {
+      nextStarred = !p.starred;
+      return { ...p, starred: nextStarred, updatedAt: Date.now() };
+    }
+    return p;
+  });
+  saveProjects(next);
+  return nextStarred;
+}
+
+export function renameProject(id: string, newName: string): boolean {
+  const all = loadProjects();
+  const next = all.map((p) => {
+    if (p.id === id) {
+      return { ...p, name: newName.trim(), updatedAt: Date.now() };
+    }
+    return p;
+  });
+  saveProjects(next);
+  return true;
+}
+
+export function trashProject(id: string): boolean {
+  const all = loadProjects();
+  const next = all.map((p) => {
+    if (p.id === id) {
+      return { ...p, isTrash: true, trashedAt: Date.now(), updatedAt: Date.now() };
+    }
+    return p;
+  });
+  saveProjects(next);
+  return true;
+}
+
+export function restoreProject(id: string): boolean {
+  const all = loadProjects();
+  const next = all.map((p) => {
+    if (p.id === id) {
+      return { ...p, isTrash: false, trashedAt: undefined, updatedAt: Date.now() };
+    }
+    return p;
+  });
+  saveProjects(next);
+  return true;
+}
+
+export function deleteProjectPermanently(id: string): boolean {
+  const all = loadProjects();
+  const next = all.filter((p) => p.id !== id);
+  saveProjects(next);
+  return true;
+}
+
+export function emptyTrash(): void {
+  const all = loadProjects();
+  const next = all.filter((p) => !p.isTrash);
+  saveProjects(next);
 }
 
 export function loadEditorSettings(): EditorSettings {
@@ -499,4 +721,3 @@ export function exportProjectAsJSON(project: Project): void {
   downloadAnchor.click();
   downloadAnchor.remove();
 }
-

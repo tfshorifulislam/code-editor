@@ -74,7 +74,7 @@ export default function Pricing() {
             {/* CTA Button */}
             <div className="pt-2">
               <Link
-                href="/editor"
+                href="/projects"
                 className="landing-button-primary w-full !py-3.5 text-base"
               >
                 <span>Get Started Free</span>
