@@ -52,19 +52,19 @@ export default function Navbar() {
 
         {/* Desktop CTA actions */}
         <div className="hidden md:flex items-center gap-3">
-          <a
-            href="#editor-demo"
+          <Link
+            href="/editor"
             className="text-sm font-medium landing-muted hover:text-[var(--color-foreground)] px-3 py-2 rounded-[var(--radius-md)] hover:bg-[var(--color-surface-hover)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
           >
             Sign In
-          </a>
-          <a
-            href="#editor-demo"
+          </Link>
+          <Link
+            href="/editor"
             className="landing-button-primary !py-2 !px-4 text-xs sm:text-sm"
           >
             <span>Start Coding Free</span>
             <ArrowRight className="w-3.5 h-3.5" />
-          </a>
+          </Link>
         </div>
 
         {/* Mobile menu button */}
@@ -101,20 +101,20 @@ export default function Navbar() {
             ))}
           </div>
           <div className="pt-4 border-t border-[var(--color-border)] flex flex-col gap-2">
-            <a
-              href="#editor-demo"
+            <Link
+              href="/editor"
               onClick={handleLinkClick}
               className="w-full text-center text-sm font-medium landing-muted hover:text-[var(--color-foreground)] py-2.5 rounded-[var(--radius-md)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-colors"
             >
               Sign In
-            </a>
-            <a
-              href="#editor-demo"
+            </Link>
+            <Link
+              href="/editor"
               onClick={handleLinkClick}
               className="w-full text-center landing-button-primary !py-2.5"
             >
               Start Coding Free
-            </a>
+            </Link>
           </div>
         </div>
       )}

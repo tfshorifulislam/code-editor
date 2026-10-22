@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 import { ArrowRight, Sparkles, CheckCircle2 } from "lucide-react";
 
 export default function FinalCTA() {
@@ -32,13 +33,13 @@ export default function FinalCTA() {
             </p>
 
             <div className="pt-2 sm:pt-3 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
-              <a
-                href="#editor-demo"
+              <Link
+                href="/editor"
                 className="landing-button-primary w-full sm:w-auto text-base !py-3 !px-7"
               >
                 <span>Start Coding Free</span>
                 <ArrowRight className="w-4 h-4" />
-              </a>
+              </Link>
               <a
                 href="#editor-demo"
                 className="landing-button-secondary w-full sm:w-auto text-base !py-3 !px-6"

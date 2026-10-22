@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useSyncExternalStore } from "react";
+import { usePathname } from "next/navigation";
 import { ReactLenis } from "lenis/react";
 
 interface SmoothScrollProps {
@@ -26,14 +27,16 @@ function getReducedMotionServerSnapshot(): boolean {
 }
 
 export default function SmoothScroll({ children }: SmoothScrollProps) {
+  const pathname = usePathname();
   const isReducedMotion = useSyncExternalStore(
     subscribeReducedMotion,
     getReducedMotionSnapshot,
     getReducedMotionServerSnapshot
   );
 
-  // When reduced motion is preferred, use native browser scrolling without animation
-  if (isReducedMotion) {
+  // When reduced motion is preferred or inside the /editor route,
+  // use native browser scrolling without animation so IDE panels and Monaco operate smoothly.
+  if (isReducedMotion || pathname?.startsWith("/editor")) {
     return <>{children}</>;
   }
 

@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 import { Check, Sparkles, ArrowRight } from "lucide-react";
 
 export default function Pricing() {
@@ -72,13 +73,13 @@ export default function Pricing() {
 
             {/* CTA Button */}
             <div className="pt-2">
-              <a
-                href="#editor-demo"
+              <Link
+                href="/editor"
                 className="landing-button-primary w-full !py-3.5 text-base"
               >
                 <span>Get Started Free</span>
                 <ArrowRight className="w-4 h-4" />
-              </a>
+              </Link>
               <p className="text-center text-xs landing-muted mt-3">
                 No credit card required • Instant access in your browser
               </p>
