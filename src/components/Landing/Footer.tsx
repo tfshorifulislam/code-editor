@@ -5,7 +5,7 @@ import { Code2, ExternalLink } from "lucide-react";
 export default function Footer() {
   return (
     <footer className="bg-[var(--color-surface)] border-t border-[var(--color-border)] landing-muted text-sm">
-      <div className="landing-container py-12 sm:py-16">
+      <div className="landing-container py-8 sm:py-12">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8 lg:gap-12">
           {/* Brand Info Column */}
           <div className="col-span-2 space-y-4">
@@ -158,7 +158,7 @@ export default function Footer() {
         </div>
 
         {/* Bottom Bar */}
-        <div className="mt-12 pt-8 border-t border-[var(--color-border)] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs landing-muted">
+        <div className="mt-8 pt-6 border-t border-[var(--color-border)] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs landing-muted">
           <p>© 2026 Code Editor. All rights reserved.</p>
           <p className="flex items-center gap-1">
             Built for developers with modern web standards.

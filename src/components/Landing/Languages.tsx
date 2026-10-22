@@ -82,15 +82,15 @@ export default function Languages() {
     <section id="languages" className="landing-section bg-[var(--color-surface)]">
       <div className="landing-container">
         {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto mb-14 sm:mb-20">
-          <div className="landing-eyebrow mb-4">
+        <div className="text-center max-w-3xl mx-auto mb-8 sm:mb-12">
+          <div className="landing-eyebrow mb-3 sm:mb-4">
             <Code2 className="w-3.5 h-3.5" />
             <span>Supported Languages</span>
           </div>
           <h2 className="landing-section-title">
             Your language. Your workflow.
           </h2>
-          <p className="landing-paragraph mt-4">
+          <p className="landing-paragraph mt-3 sm:mt-4">
             Engineered with dedicated syntax parsers, intelligent code folding,
             and formatting for the languages you build with every day.
           </p>
@@ -144,7 +144,7 @@ export default function Languages() {
         </div>
 
         {/* Technical Transparency Note */}
-        <div className="mt-12 text-center text-xs landing-muted max-w-2xl mx-auto">
+        <div className="mt-8 sm:mt-10 text-center text-xs landing-muted max-w-2xl mx-auto">
           Language syntax highlighting, bracket matching, and editor tooling are
           provided in-browser. Web projects (HTML, CSS, JavaScript, TypeScript)
           support live client-side preview execution.

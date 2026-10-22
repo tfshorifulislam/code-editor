@@ -47,22 +47,22 @@ export default function FAQ() {
     <section id="faq" className="landing-section bg-[var(--color-surface-hover)] border-t border-[var(--color-border)]">
       <div className="landing-container max-w-4xl">
         {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto mb-14 sm:mb-20">
-          <div className="landing-eyebrow mb-4 bg-white">
+        <div className="text-center max-w-3xl mx-auto mb-8 sm:mb-12">
+          <div className="landing-eyebrow mb-3 sm:mb-4 bg-white">
             <HelpCircle className="w-3.5 h-3.5" />
             <span>Got Questions?</span>
           </div>
           <h2 className="landing-section-title">
             Frequently Asked Questions
           </h2>
-          <p className="landing-paragraph mt-4">
+          <p className="landing-paragraph mt-3 sm:mt-4">
             Honest answers about the capabilities, supported languages, and
             features of our browser-based editor.
           </p>
         </div>
 
         {/* Accordion Container */}
-        <div className="space-y-3.5">
+        <div className="space-y-2.5 sm:space-y-3">
           {faqs.map((faq, idx) => {
             const isOpen = openIndex === idx;
             return (

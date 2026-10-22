@@ -157,8 +157,8 @@ body {
   /* ==========================================================================
      C. Global Spacing & Layout Tokens
      ========================================================================== */
-  --spacing-section: clamp(4.5rem, 7vw, 7.5rem);
-  --spacing-section-mobile: 3.5rem;
+  --spacing-section: clamp(3.25rem, 5vw, 5rem);
+  --spacing-section-mobile: 2.25rem;
   --spacing-content: 1.5rem;
   --spacing-element: 1rem;
   --container-max-width: 80rem;

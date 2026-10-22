@@ -16,15 +16,15 @@ export default function Pricing() {
     <section id="pricing" className="landing-section bg-[var(--color-surface)]">
       <div className="landing-container">
         {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto mb-14 sm:mb-20">
-          <div className="landing-eyebrow mb-4">
+        <div className="text-center max-w-3xl mx-auto mb-8 sm:mb-12">
+          <div className="landing-eyebrow mb-3 sm:mb-4">
             <Sparkles className="w-3.5 h-3.5" />
             <span>Honest & Transparent</span>
           </div>
           <h2 className="landing-section-title">
             Everything you need to get started.
           </h2>
-          <p className="landing-paragraph mt-4">
+          <p className="landing-paragraph mt-3 sm:mt-4">
             Start coding immediately in your browser. All core editor tools and
             AI features are available with no upfront cost.
           </p>
@@ -37,7 +37,7 @@ export default function Pricing() {
             Free Plan • Browser Workspace
           </div>
 
-          <div className="p-6 sm:p-10 space-y-8">
+          <div className="p-6 sm:p-8 space-y-6">
             {/* Price Header */}
             <div>
               <div className="flex items-baseline gap-2">

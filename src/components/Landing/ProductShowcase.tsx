@@ -14,22 +14,22 @@ export default function ProductShowcase() {
     <section id="features" className="landing-section bg-[var(--color-surface)]">
       <div className="landing-container">
         {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto mb-16 sm:mb-24">
-          <div className="landing-eyebrow mb-4">
+        <div className="text-center max-w-3xl mx-auto mb-10 sm:mb-14">
+          <div className="landing-eyebrow mb-3 sm:mb-4">
             <Layers className="w-3.5 h-3.5" />
             <span>Product Highlights</span>
           </div>
           <h2 className="landing-section-title">
             From first prompt to finished product.
           </h2>
-          <p className="landing-paragraph mt-4">
+          <p className="landing-paragraph mt-3 sm:mt-4">
             A developer workspace designed for clarity and speed. Everything you
             need to write, review, and preview web projects in one browser tab.
           </p>
         </div>
 
         {/* Feature Stories Container */}
-        <div className="space-y-24 sm:space-y-36">
+        <div className="space-y-14 sm:space-y-20">
           {/* Story A: Code without friction (Text Left, Visual Right) */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
             {/* Story A Text */}

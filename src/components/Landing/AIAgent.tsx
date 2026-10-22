@@ -49,15 +49,15 @@ export default function AIAgent() {
 
       <div className="landing-container relative">
         {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto mb-14 sm:mb-20">
-          <div className="landing-eyebrow mb-4 bg-white">
+        <div className="text-center max-w-3xl mx-auto mb-8 sm:mb-12">
+          <div className="landing-eyebrow mb-3 sm:mb-4 bg-white">
             <Sparkles className="w-3.5 h-3.5 text-[var(--color-accent)]" />
             <span>Autonomous AI Assistant</span>
           </div>
           <h2 className="landing-section-title">
             Describe it. Build it. Improve it.
           </h2>
-          <p className="landing-paragraph mt-4">
+          <p className="landing-paragraph mt-3 sm:mt-4">
             Turn natural language instructions into clean, modular code. The AI
             breaks down complex requests into transparent, verifiable steps.
           </p>

@@ -171,7 +171,7 @@ export default function CodeEditorMockup() {
   };
 
   return (
-    <section id="editor-demo" className="pt-2 pb-14 sm:pb-20 bg-[var(--color-surface)] relative">
+    <section id="editor-demo" className="pt-2 pb-6 sm:pb-10 bg-[var(--color-surface)] relative">
       <div className="landing-container px-3 sm:px-6 relative">
         {/* Subtle restrained purple glow behind the mockup */}
         <div

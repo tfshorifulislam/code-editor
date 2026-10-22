@@ -77,22 +77,22 @@ export default function HowItWorks() {
     <section id="how-it-works" className="landing-section bg-[var(--color-surface-hover)] border-t border-[var(--color-border)]">
       <div className="landing-container">
         {/* Header */}
-        <div className="text-center max-w-3xl mx-auto mb-16 sm:mb-24">
-          <div className="landing-eyebrow mb-4 bg-white">
+        <div className="text-center max-w-3xl mx-auto mb-8 sm:mb-12">
+          <div className="landing-eyebrow mb-3 sm:mb-4 bg-white">
             <PlayCircle className="w-3.5 h-3.5" />
             <span>Workflow Overview</span>
           </div>
           <h2 className="landing-section-title">
             From idea to working code.
           </h2>
-          <p className="landing-paragraph mt-4">
+          <p className="landing-paragraph mt-3 sm:mt-4">
             A frictionless development cycle designed to keep you focused on
             building, not configuring.
           </p>
         </div>
 
         {/* Steps Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6 relative">
           {steps.map((step) => (
             <div
               key={step.number}
