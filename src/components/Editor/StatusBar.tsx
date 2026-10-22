@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { GitBranch, Sparkles, Check, Cloud, Loader2, AlertCircle } from "lucide-react";
+import { GitBranch, Check, Cloud, Loader2, AlertCircle } from "lucide-react";
 import { ProjectFile } from "@/types/editor";
 
 interface StatusBarProps {
@@ -109,10 +109,6 @@ export default function StatusBar({
         <div className="hidden sm:flex items-center gap-1 text-emerald-200">
           <Check className="w-3 h-3 stroke-[2.5]" />
           <span>Prettier</span>
-        </div>
-        <div className="flex items-center gap-1 text-purple-200">
-          <Sparkles className="w-3 h-3" />
-          <span className="hidden sm:inline">AI Active</span>
         </div>
       </div>
     </footer>

@@ -32,7 +32,7 @@ export default function DebugPanel({
       case "node-api":
         return "Node.js: Launch Program (server.js)";
       default:
-        return "Web: Live Preview Runner";
+        return "Web: Dev Server (npm run dev)";
     }
   });
 
@@ -92,7 +92,7 @@ export default function DebugPanel({
               <option value="Go: Launch Service (go run main.go)">Go: Launch Service (go run main.go)</option>
               <option value="Rust: Cargo Run">Rust: Cargo Run</option>
               <option value="Node.js: Launch Program (server.js)">Node.js: Launch Program (server.js)</option>
-              <option value="Web: Live Preview Runner">Web: Live Preview Runner</option>
+              <option value="Web: Dev Server (npm run dev)">Web: Dev Server (npm run dev)</option>
             </select>
 
             <button

@@ -43,6 +43,7 @@ import {
   Download,
   Plus,
   Sparkles,
+  FolderCog,
   Save,
   Terminal as TerminalIcon,
   Play,
@@ -152,6 +153,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
   const [isTerminalOpen, setIsTerminalOpen] = useState(true);
   const [terminalTab, setTerminalTab] = useState<BottomTab>("terminal");
   const [isPreviewOpen, setIsPreviewOpen] = useState(true);
+  const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
   const [isAIOpen, setIsAIOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
@@ -535,6 +537,23 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
     ]);
   };
 
+  const handleRunPreview = useCallback(() => {
+    setIsPreviewOpen((prev) => {
+      if (!prev) return true;
+      setPreviewRefreshKey((k) => k + 1);
+      return true;
+    });
+    setConsoleMessages((prev) => [
+      ...prev,
+      {
+        id: getEditorUniqueId("prev-run"),
+        type: "info",
+        content: "▶ Run Preview: Generating live application build...",
+        timestamp: getTimestamp(),
+      },
+    ]);
+  }, []);
+
   // Global Keyboard Shortcuts
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
@@ -543,6 +562,12 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
       if (isCmdOrCtrl && e.key.toLowerCase() === "s") {
         e.preventDefault();
         handleSaveActiveFile();
+      } else if (e.key === "F5") {
+        e.preventDefault();
+        handleRunPreview();
+      } else if (isCmdOrCtrl && e.shiftKey && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        setIsAIOpen((prev) => !prev);
       } else if (isCmdOrCtrl && e.shiftKey && e.key.toLowerCase() === "p") {
         e.preventDefault();
         setIsCommandPaletteOpen((prev) => !prev);
@@ -560,7 +585,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
 
     window.addEventListener("keydown", handleGlobalKeyDown);
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
-  }, [handleSaveActiveFile]);
+  }, [handleSaveActiveFile, handleRunPreview]);
 
   // Command Palette Items
   const commandList: CommandItem[] = [
@@ -583,10 +608,11 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
     },
     {
       id: "cmd-preview",
-      title: "View: Toggle Live Preview",
-      category: "View",
+      title: "Run: Run Live Preview",
+      category: "Run",
+      shortcut: "F5",
       icon: <Play className="w-4 h-4 text-emerald-400" />,
-      action: () => setIsPreviewOpen((prev) => !prev),
+      action: handleRunPreview,
     },
     {
       id: "cmd-terminal",
@@ -598,8 +624,9 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
     },
     {
       id: "cmd-ai",
-      title: "AI: Toggle AI Coding Assistant",
+      title: "AI: Open AI Coding Assistant",
       category: "AI",
+      shortcut: "Ctrl+Shift+A",
       icon: <Sparkles className="w-4 h-4 text-[#a78bfa]" />,
       action: () => setIsAIOpen((prev) => !prev),
     },
@@ -629,7 +656,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
       title: "Project: Initialize Framework / Add Tooling...",
       category: "Project",
       shortcut: "Ctrl+Shift+I",
-      icon: <Sparkles className="w-4 h-4 text-amber-400" />,
+      icon: <FolderCog className="w-4 h-4 text-amber-400" />,
       action: () => setIsInitializeDialogOpen(true),
     },
     {
@@ -755,13 +782,14 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
             )}
           </div>
 
+          {/* AI Agent Entry Point (Single Source of Truth) */}
           <button
             type="button"
             onClick={() => setIsAIOpen((prev) => !prev)}
-            title="Toggle AI Assistant"
+            title={isAIOpen ? "Close AI Assistant" : "Open AI Assistant (Ctrl+Shift+A)"}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition cursor-pointer ${
               isAIOpen
-                ? "bg-[#382b5f] text-[#c4b5fd]"
+                ? "bg-[#382b5f] text-[#c4b5fd] ring-1 ring-[#a78bfa]/40 shadow-xs"
                 : "text-neutral-300 hover:bg-[#2b2b2b] hover:text-white"
             }`}
           >
@@ -769,18 +797,19 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
             <span className="hidden sm:inline">AI Agent</span>
           </button>
 
+          {/* Run Preview Button (Single Source of Truth) */}
           <button
             type="button"
-            onClick={() => setIsPreviewOpen((prev) => !prev)}
-            title="Toggle Live Preview"
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition cursor-pointer ${
+            onClick={handleRunPreview}
+            title={isPreviewOpen ? "Run / Refresh Preview (F5)" : "Run Preview (F5)"}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-semibold transition cursor-pointer shadow-xs ${
               isPreviewOpen
-                ? "bg-[var(--color-primary)] text-white shadow-xs"
-                : "bg-[#2b2b2b] text-neutral-200 hover:bg-[#383838] hover:text-white"
+                ? "bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)]"
+                : "bg-emerald-600 hover:bg-emerald-500 text-white"
             }`}
           >
             <Play className="w-3.5 h-3.5 fill-current" />
-            <span className="hidden sm:inline">Preview</span>
+            <span className="hidden sm:inline">Run Preview</span>
           </button>
         </div>
       </header>
@@ -966,10 +995,6 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
             unsavedFiles={unsavedFiles}
             onSelectTab={handleSelectFile}
             onCloseTab={handleCloseTab}
-            onTogglePreview={() => setIsPreviewOpen((prev) => !prev)}
-            isPreviewOpen={isPreviewOpen}
-            onToggleAI={() => setIsAIOpen((prev) => !prev)}
-            isAIOpen={isAIOpen}
           />
 
           {/* Monaco Editor Core Engine */}
@@ -1004,6 +1029,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
               isOpen={isPreviewOpen}
               onClose={() => setIsPreviewOpen(false)}
               onConsoleMessage={handleConsoleMessage}
+              refreshTrigger={previewRefreshKey}
             />
           </div>
         )}
@@ -1078,7 +1104,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
               >
                 <div className="flex items-center gap-2.5">
                   <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400">
-                    <Sparkles className="w-4 h-4" />
+                    <FolderCog className="w-4 h-4" />
                   </div>
                   <div>
                     <div className="font-semibold text-white text-xs">Initialize Framework / Add Tooling</div>

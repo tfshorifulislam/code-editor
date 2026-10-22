@@ -19,7 +19,7 @@ import {
   ChevronRight,
   ChevronDown,
   RefreshCw,
-  Sparkles,
+  FolderCog,
 } from "lucide-react";
 import { Project, ProjectFile } from "@/types/editor";
 import { getPublicRelativePath } from "./ImagePreviewer";
@@ -418,7 +418,7 @@ export default function FileExplorer({
               title="Initialize Framework / Add Tooling"
               className="p-1 hover:text-white rounded hover:bg-[#333333] transition cursor-pointer text-amber-400 hover:text-amber-300"
             >
-              <Sparkles className="w-3.5 h-3.5" />
+              <FolderCog className="w-3.5 h-3.5" />
             </button>
           )}
           <button
@@ -518,7 +518,7 @@ export default function FileExplorer({
                   onClick={onOpenInitializeProject}
                   className="w-full py-1.5 px-3 bg-[var(--color-primary)] hover:opacity-90 text-white rounded text-xs font-medium flex items-center justify-center gap-2 shadow-xs transition cursor-pointer"
                 >
-                  <Sparkles className="w-3.5 h-3.5" />
+                  <FolderCog className="w-3.5 h-3.5" />
                   <span>Initialize Framework</span>
                 </button>
               )}

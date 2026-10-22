@@ -7,8 +7,6 @@ import {
   FileJson,
   File,
   X,
-  Play,
-  Sparkles,
 } from "lucide-react";
 import { ProjectFile } from "@/types/editor";
 
@@ -18,10 +16,6 @@ interface EditorTabsProps {
   unsavedFiles: Record<string, boolean>;
   onSelectTab: (fileId: string) => void;
   onCloseTab: (fileId: string, e: MouseEvent) => void;
-  onTogglePreview: () => void;
-  isPreviewOpen: boolean;
-  onToggleAI: () => void;
-  isAIOpen: boolean;
 }
 
 export default function EditorTabs({
@@ -30,10 +24,6 @@ export default function EditorTabs({
   unsavedFiles,
   onSelectTab,
   onCloseTab,
-  onTogglePreview,
-  isPreviewOpen,
-  onToggleAI,
-  isAIOpen,
 }: EditorTabsProps) {
   const renderTabIcon = (file: ProjectFile) => {
     const ext = file.name.split(".").pop()?.toLowerCase();
@@ -95,37 +85,6 @@ export default function EditorTabs({
             </div>
           );
         })}
-      </div>
-
-      {/* Editor Action Controls (Right side of tab bar) */}
-      <div className="flex items-center gap-1.5 px-3 shrink-0">
-        <button
-          type="button"
-          onClick={onToggleAI}
-          title={isAIOpen ? "Close AI Assistant" : "Open AI Assistant"}
-          className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition cursor-pointer ${
-            isAIOpen
-              ? "bg-[#382b5f] text-[#c4b5fd]"
-              : "text-neutral-300 hover:bg-[#333333] hover:text-white"
-          }`}
-        >
-          <Sparkles className="w-3.5 h-3.5 text-[#a78bfa]" />
-          <span className="hidden sm:inline">AI Agent</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={onTogglePreview}
-          title={isPreviewOpen ? "Close Live Preview" : "Open Live Preview"}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition cursor-pointer ${
-            isPreviewOpen
-              ? "bg-[var(--color-primary)] text-white shadow-xs"
-              : "bg-[#333333] text-neutral-200 hover:bg-[#3f3f3f] hover:text-white"
-          }`}
-        >
-          <Play className="w-3 h-3 fill-current" />
-          <span className="hidden sm:inline">Run Preview</span>
-        </button>
       </div>
     </div>
   );

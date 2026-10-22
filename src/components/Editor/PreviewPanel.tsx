@@ -17,6 +17,7 @@ interface PreviewPanelProps {
   isOpen: boolean;
   onClose: () => void;
   onConsoleMessage?: (type: "log" | "error" | "warn" | "info", text: string) => void;
+  refreshTrigger?: number;
 }
 
 export default function PreviewPanel({
@@ -24,6 +25,7 @@ export default function PreviewPanel({
   isOpen,
   onClose,
   onConsoleMessage,
+  refreshTrigger,
 }: PreviewPanelProps) {
   const [deviceMode, setDeviceMode] = useState<"desktop" | "tablet" | "mobile">("desktop");
   const [key, setKey] = useState(0);
@@ -33,7 +35,7 @@ export default function PreviewPanel({
   const previewHtml = useMemo(() => {
     return generatePreviewHtml(project);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project, key]);
+  }, [project, key, refreshTrigger]);
 
   // Listen for console bridge messages from the iframe
   useEffect(() => {
