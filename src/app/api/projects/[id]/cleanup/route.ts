@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { getProjectById, deleteProject } from "@/lib/server/projectService";
 import { killSessionProcess } from "@/lib/server/terminalProcessManager";
+import { closeAllPtySessions } from "@/lib/server/terminalPtyManager";
 import { getWorkspaceDir } from "@/lib/server/workspaceDisk";
 import fsp from "fs/promises";
 
@@ -21,7 +22,8 @@ export async function POST(req: Request, { params }: RouteProps) {
     return NextResponse.json({ success: true });
   }
 
-  // 1. Terminate any running process
+  // 1. Terminate any running process and PTY sessions
+  closeAllPtySessions(projectId);
   await killSessionProcess(projectId);
 
   // 2. Remove workspace disk folder

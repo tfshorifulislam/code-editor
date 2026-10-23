@@ -1,5 +1,4 @@
 import { WebSocketServer, WebSocket } from "ws";
-import { parse as parseUrl } from "url";
 import {
   getPtySession,
   createPtySession,
@@ -36,10 +35,17 @@ export function getOrCreateTerminalWSServer(): WebSocketServer {
       currentBoundPort = port;
       wssInstance = server;
 
+      server.on("listening", () => {
+        const addr = server.address();
+        if (typeof addr === "object" && addr) {
+          currentBoundPort = addr.port;
+        }
+      });
+
       server.on("connection", (ws: WebSocket, req) => {
-        const { query } = parseUrl(req.url || "", true);
-        const projectId = query.projectId as string;
-        let sessionId = query.sessionId as string;
+        const url = new URL(req.url || "", "http://localhost");
+        const projectId = url.searchParams.get("projectId") || "";
+        let sessionId = url.searchParams.get("sessionId") || "";
 
         if (!projectId) {
           ws.send(JSON.stringify({ type: "error", data: "Missing projectId parameter.\r\n" }));

@@ -347,3 +347,20 @@ export function closePtySession(projectId: string, sessionId: string): boolean {
   map.delete(sessionId);
   return true;
 }
+
+/**
+ * Closes and terminates all PTY sessions for a project.
+ */
+export function closeAllPtySessions(projectId: string): void {
+  const map = projectPtySessions.get(projectId);
+  if (map) {
+    for (const session of map.values()) {
+      session.isAlive = false;
+      try {
+        session.ptyProcess.kill();
+      } catch {}
+    }
+    map.clear();
+    projectPtySessions.delete(projectId);
+  }
+}

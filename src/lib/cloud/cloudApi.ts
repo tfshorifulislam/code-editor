@@ -336,7 +336,13 @@ export const cloudApi = {
   },
 
   terminal: {
-    async startSession(name?: string): Promise<{ projectId: string; name: string; cwd: string }> {
+    async startSession(name?: string): Promise<{
+      projectId: string;
+      name: string;
+      cwd: string;
+      sessionId?: string;
+      wsPort?: number;
+    }> {
       const res = await fetch("/api/projects/terminal-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

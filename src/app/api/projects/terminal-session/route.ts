@@ -3,6 +3,8 @@ import { getSessionUser } from "@/lib/auth/session";
 import { createCloudProject } from "@/lib/server/projectService";
 import { ensureWorkspaceOnDisk } from "@/lib/server/workspaceDisk";
 import { setSessionCwd } from "@/lib/server/terminalProcessManager";
+import { createPtySession, listPtySessions } from "@/lib/server/terminalPtyManager";
+import { getOrCreateTerminalWSServer, getTerminalWSPort } from "@/lib/server/terminalWebSocketServer";
 
 export async function POST(req: Request) {
   const user = await getSessionUser();
@@ -33,12 +35,25 @@ export async function POST(req: Request) {
     // Reset session working directory to workspace root
     setSessionCwd(project.id, "");
 
+    // Start WebSocket server if not already running
+    try {
+      getOrCreateTerminalWSServer();
+    } catch (err) {
+      console.warn("WebSocket server start error:", err);
+    }
+
+    // Create initial persistent PTY session for real shell interactions
+    const ptySession = createPtySession(project.id);
+    const wsPort = getTerminalWSPort();
+
     return NextResponse.json(
       {
         projectId: project.id,
         name: project.name,
         cwd: "",
         workspaceDir,
+        sessionId: ptySession.id,
+        wsPort,
       },
       { status: 201 }
     );

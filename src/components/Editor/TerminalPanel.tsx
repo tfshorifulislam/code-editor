@@ -41,6 +41,7 @@ interface ActiveSessionHandle {
   ws?: WebSocket;
   isWsConnected: boolean;
   httpAbortController?: AbortController;
+  hasReceivedInitBuffer?: boolean;
 }
 
 export default function TerminalPanel({
@@ -183,7 +184,8 @@ export default function TerminalPanel({
           try {
             const msg = JSON.parse(event.data);
             if (msg.type === "init") {
-              if (msg.buffer) {
+              if (msg.buffer && !handle.hasReceivedInitBuffer) {
+                handle.hasReceivedInitBuffer = true;
                 term.write(msg.buffer);
               }
             } else if (msg.type === "output" && typeof msg.data === "string") {
@@ -264,6 +266,9 @@ export default function TerminalPanel({
       const term = new XTerm({
         cursorBlink: true,
         cursorStyle: "block",
+        cursorInactiveStyle: "outline",
+        cursorWidth: 1,
+        scrollback: 5000,
         fontFamily: 'Menlo, Monaco, "Courier New", "Fira Code", monospace',
         fontSize: 12,
         letterSpacing: 0.5,
@@ -297,6 +302,29 @@ export default function TerminalPanel({
       const fitAddon = new FitAddon();
       term.loadAddon(fitAddon);
       term.loadAddon(new WebLinksAddon());
+
+      // Clipboard and shortcut integration
+      term.attachCustomKeyEventHandler((event: KeyboardEvent) => {
+        // If Ctrl+C (or Cmd+C) pressed and text is highlighted, allow browser copy
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "c" && term.hasSelection()) {
+          return false;
+        }
+        // If Ctrl+V (or Cmd+V) pressed, paste from clipboard
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "v" && event.type === "keydown") {
+          navigator.clipboard?.readText?.().then((text) => {
+            if (text) {
+              const currentHandle = sessionsMapRef.current.get(activeSessionId);
+              if (currentHandle?.ws && currentHandle.ws.readyState === WebSocket.OPEN) {
+                currentHandle.ws.send(JSON.stringify({ type: "input", data: text }));
+              } else {
+                cloudApi.terminal.sendSessionInput(project.id, activeSessionId, text);
+              }
+            }
+          }).catch(() => {});
+          return false;
+        }
+        return true;
+      });
 
       term.open(containerEl);
 
@@ -404,13 +432,32 @@ export default function TerminalPanel({
       const remaining = sessions.filter((s) => s.id !== sessionId);
       setSessions(remaining);
 
-      if (activeSessionId === sessionId) {
-        setActiveSessionId(remaining[0]?.id || "");
+      if (remaining.length === 0) {
+        const newSess = await cloudApi.terminal.createSession(project.id);
+        await loadSessionsData();
+        setActiveSessionId(newSess.session.id);
+      } else if (activeSessionId === sessionId) {
+        setActiveSessionId(remaining[0].id);
       }
     } catch (err) {
       console.warn("Failed to close session:", err);
     }
   };
+
+  // Cleanup all open xterm sessions on unmount or project switch
+  useEffect(() => {
+    return () => {
+      sessionsMapRef.current.forEach((handle) => {
+        try {
+          if (handle.ws) handle.ws.close();
+          if (handle.httpAbortController) handle.httpAbortController.abort();
+          handle.term.dispose();
+          handle.containerEl.remove();
+        } catch {}
+      });
+      sessionsMapRef.current.clear();
+    };
+  }, [project.id]);
 
   // Rename Session Tab
   const handleRenameSessionSubmit = async (sessionId: string) => {
