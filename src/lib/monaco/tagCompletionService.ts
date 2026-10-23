@@ -29,12 +29,61 @@ const JS_KEYWORDS = new Set([
   "interface", "type", "namespace", "as", "is", "keyof", "readonly"
 ]);
 
-type EmmetSyntax = "html" | "jsx" | "css";
+export type EmmetSyntax = "html" | "jsx" | "css";
 
 export function getSyntaxForLanguage(languageId: string): EmmetSyntax {
   if (languageId === "css") return "css";
   if (languageId === "html") return "html";
   return "jsx"; // typescript, javascript, jsx, tsx
+}
+
+/**
+ * Returns the snippet template for an HTML tag with cursor tab-stops placed between tags.
+ */
+export function getTagSnippet(tag: string, syntax: EmmetSyntax): string {
+  const isJsx = syntax === "jsx";
+  const tagLower = tag.toLowerCase();
+
+  if (tag === "Fragment") {
+    return "<>$0</>";
+  }
+  if (tagLower === "img") {
+    return isJsx ? '<img src="$1" alt="$2" />$0' : '<img src="$1" alt="$2">$0';
+  }
+  if (tagLower === "input") {
+    return isJsx ? '<input type="${1:text}" $0/>' : '<input type="${1:text}" $0>';
+  }
+  if (tagLower === "a") {
+    return '<a href="$1">$0</a>';
+  }
+  if (tagLower === "form") {
+    return '<form action="$1">$0</form>';
+  }
+  if (tagLower === "br") {
+    return isJsx ? '<br />$0' : '<br>$0';
+  }
+  if (tagLower === "hr") {
+    return isJsx ? '<hr />$0' : '<hr>$0';
+  }
+  if (VOID_ELEMENTS.has(tagLower)) {
+    return isJsx ? `<${tag} $0/>` : `<${tag}$0>`;
+  }
+  return `<${tag}>$0</${tag}>`;
+}
+
+/**
+ * Converts expanded markup with empty tags into snippet tabstops.
+ */
+function convertMarkupToSnippet(expanded: string): string {
+  const matches = (expanded.match(/><\//g) || []).length;
+  if (matches === 1) {
+    return expanded.replace(/><\//, ">$0</");
+  }
+  if (matches > 1) {
+    let i = 1;
+    return expanded.replace(/><\//g, () => `>\${${i++}}</`);
+  }
+  return expanded;
 }
 
 /**
@@ -60,7 +109,7 @@ export function expandEmmetAbbreviation(
     });
 
     if (expanded && expanded !== abbr) {
-      return expanded;
+      return convertMarkupToSnippet(expanded);
     }
   } catch {
     // Invalid Emmet abbreviation syntax
@@ -79,12 +128,16 @@ export function extractAbbreviation(
   const textBefore = lineText.substring(0, cursorCol - 1);
   if (!textBefore.trim()) return null;
 
-  // 1. Comments and closing tags
-  if (textBefore.trim().startsWith("//") || textBefore.trim().startsWith("/*") || /<\/[a-zA-Z0-9_\-]*$/.test(textBefore)) {
+  // 1. Comments and closing tags check
+  if (
+    textBefore.trim().startsWith("//") ||
+    textBefore.trim().startsWith("/*") ||
+    /<\/[a-zA-Z0-9_\-]*$/.test(textBefore)
+  ) {
     return null;
   }
 
-  // 2. Inside attributes: <tag attr="...
+  // 2. Inside attributes check: <tag attr="...
   const lastOpen = textBefore.lastIndexOf("<");
   const lastClose = textBefore.lastIndexOf(">");
   if (lastOpen !== -1 && lastClose < lastOpen) {
@@ -159,119 +212,158 @@ export function registerHtmlJsxTagCompletion(monaco: typeof Monaco): void {
     { id: "css", syntax: "css" as EmmetSyntax },
   ];
 
+  // 1. Configure Language Rules for multi-line tag splitting on Enter:
+  // When cursor is inside <tag>|</tag> and Enter is pressed,
+  // Monaco will automatically split and indent:
+  // <tag>
+  //     |
+  // </tag>
+  for (const { id: lang } of languages) {
+    if (lang !== "css") {
+      monaco.languages.setLanguageConfiguration(lang, {
+        onEnterRules: [
+          {
+            // Matches: <tag ...> and </tag> (even with arrow functions or complex props)
+            beforeText: /<([_a-zA-Z0-9]+)(?:\s+[^<]*?)?>$/,
+            afterText: /^<\/([_a-zA-Z0-9]+)>/,
+            action: {
+              indentAction: monaco.languages.IndentAction.IndentOutdent,
+            },
+          },
+          {
+            // Matches: <> and </>
+            beforeText: /<>$|(?:\s+<>)$/,
+            afterText: /^<\/>/,
+            action: {
+              indentAction: monaco.languages.IndentAction.IndentOutdent,
+            },
+          },
+        ],
+      });
+    }
+  }
+
+  // 2. Register Completion Item Provider
   for (const { id: lang, syntax } of languages) {
     const disposable = monaco.languages.registerCompletionItemProvider(lang, {
-      triggerCharacters: [
-        "<", ">", "/", ".", "#", ">", "*", "+", "{", "}", "[", "]",
-        ...Array.from("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-      ],
+      triggerCharacters: ["<", "/", ".", ">", ":", "@", "#", "!"],
 
       provideCompletionItems: (model, position) => {
         const lineContent = model.getLineContent(position.lineNumber);
         const textBeforeCursor = lineContent.substring(0, position.column - 1);
 
-        // Closing tag check
+        // Check if cursor is typing a closing tag: </...
         if (/<\/[a-zA-Z0-9_\-]*$/.test(textBeforeCursor)) {
           return { suggestions: [] };
         }
 
-        // Comments check
+        // Check if cursor is inside comments
         const trimmedBefore = textBeforeCursor.trim();
-        if (trimmedBefore.startsWith("//") || trimmedBefore.startsWith("/*") || trimmedBefore.startsWith("<!--")) {
+        if (
+          trimmedBefore.startsWith("//") ||
+          trimmedBefore.startsWith("/*") ||
+          trimmedBefore.startsWith("<!--")
+        ) {
           return { suggestions: [] };
         }
 
-        // Inside tag attributes check: e.g. <div class="..." |
+        // Check if cursor is inside attribute strings: e.g. <div className="..."
         const lastOpenAngle = textBeforeCursor.lastIndexOf("<");
         const lastCloseAngle = textBeforeCursor.lastIndexOf(">");
         const hasOpeningBracket = lastOpenAngle !== -1 && lastCloseAngle < lastOpenAngle;
 
         const word = model.getWordUntilPosition(position);
         if (hasOpeningBracket && lastOpenAngle < word.startColumn - 2) {
+          // Inside tag attributes, don't show tag completion
           return { suggestions: [] };
         }
 
         const suggestions: Monaco.languages.CompletionItem[] = [];
 
-        // 1. Check for compound Emmet abbreviation at cursor (e.g. div.container, ul>li*3, m10)
-        const extracted = extractAbbreviation(lineContent, position.column, syntax);
-        if (extracted) {
-          const charBeforeAbbr = extracted.startColumn > 1 ? lineContent.charAt(extracted.startColumn - 2) : "";
-          const startsWithAngle = charBeforeAbbr === "<";
-          const startCol = startsWithAngle ? extracted.startColumn - 1 : extracted.startColumn;
+        // Check for compound Emmet abbreviation (e.g. div.container, ul>li*3, button.primary)
+        const hasCompoundOperator = /[.#>+*\[\]{}]/.test(textBeforeCursor.slice(-30));
+        if (hasCompoundOperator) {
+          const extracted = extractAbbreviation(lineContent, position.column, syntax);
+          if (extracted && /[.#>+*\[\]{}]/.test(extracted.abbr)) {
+            const range = new monaco.Range(
+              position.lineNumber,
+              extracted.startColumn,
+              position.lineNumber,
+              extracted.endColumn
+            );
 
-          const range: Monaco.IRange = {
-            startLineNumber: position.lineNumber,
-            endLineNumber: position.lineNumber,
-            startColumn: startCol,
-            endColumn: extracted.endColumn,
-          };
+            const previewClean = extracted.expanded
+              .replace(/\$\{\d+(?::([^}]+))?\}/g, "$1")
+              .replace(/\$\d+/g, "");
 
-          const previewClean = extracted.expanded.replace(/\$\{\d+(?::([^}]+))?\}/g, "$1").replace(/\$\d+/g, "");
-
-          suggestions.push({
-            label: extracted.abbr,
-            kind: monaco.languages.CompletionItemKind.Snippet,
-            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-            insertText: extracted.expanded,
-            detail: "Emmet Abbreviation",
-            documentation: {
-              value: `**Emmet Abbreviation**\n\n\`\`\`${syntax === "css" ? "css" : "html"}\n${previewClean}\n\`\`\``,
-            },
-            range,
-            sortText: "!0000_" + extracted.abbr,
-            filterText: extracted.abbr,
-          });
+            suggestions.push({
+              label: extracted.abbr,
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              insertText: extracted.expanded,
+              detail: "Emmet Abbreviation",
+              documentation: {
+                value: `**Emmet Abbreviation**\n\n\`\`\`${syntax === "css" ? "css" : "html"}\n${previewClean}\n\`\`\``,
+              },
+              range,
+              sortText: "!00000_emmet",
+              filterText: extracted.abbr,
+              preselect: true,
+            });
+          }
         }
 
-        // 2. In HTML and JSX/TSX: provide suggestions for standard HTML tags
+        // HTML and JSX/TSX tag catalog completions
         if (syntax !== "css") {
           const charBeforeWord = word.startColumn > 1 ? lineContent.charAt(word.startColumn - 2) : "";
           const startsWithAngle = charBeforeWord === "<";
-          const startColumn = startsWithAngle ? word.startColumn - 1 : word.startColumn;
+          const replaceStartColumn = startsWithAngle ? word.startColumn - 1 : word.startColumn;
+          const replaceEndColumn = position.column;
 
-          const range: Monaco.IRange = {
-            startLineNumber: position.lineNumber,
-            endLineNumber: position.lineNumber,
-            startColumn,
-            endColumn: word.endColumn,
-          };
+          const range = new monaco.Range(
+            position.lineNumber,
+            replaceStartColumn,
+            position.lineNumber,
+            replaceEndColumn
+          );
 
-          const currentWord = word.word.toLowerCase();
+          const currentWordLower = word.word.toLowerCase();
 
           for (const tag of COMMON_HTML_TAGS) {
-            if (!currentWord || tag.toLowerCase().startsWith(currentWord)) {
-              let insertSnippet: string | null = null;
-              if (tag === "Fragment") {
-                insertSnippet = `<>$0</>`;
-              } else {
-                insertSnippet = expandEmmetAbbreviation(tag, syntax);
-              }
+            const tagLower = tag.toLowerCase();
+            // Match tag if no word typed (e.g. user typed `<`) or tag starts with typed word
+            if (!currentWordLower || tagLower.startsWith(currentWordLower)) {
+              const snippetText = getTagSnippet(tag, syntax);
+              const preview = snippetText
+                .replace(/\$\{\d+(?::([^}]+))?\}/g, "$1")
+                .replace(/\$\d+/g, "");
 
-              if (insertSnippet) {
-                const preview = insertSnippet.replace(/\$\{\d+(?::([^}]+))?\}/g, "$1").replace(/\$\d+/g, "");
-                suggestions.push({
-                  label: tag,
-                  kind: monaco.languages.CompletionItemKind.Snippet,
-                  insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-                  insertText: insertSnippet,
-                  detail: preview,
-                  documentation: {
-                    value: `**HTML \`<${tag}>\` Element**\n\n\`\`\`html\n${preview}\n\`\`\``,
-                  },
-                  range,
-                  sortText: currentWord === tag.toLowerCase() ? "!0001_" + tag : "!0002_" + tag,
-                  filterText: tag,
-                });
-              }
+              const isExactMatch = currentWordLower === tagLower;
+              const filterText = startsWithAngle ? `<${tag}` : tag;
+              const label = startsWithAngle ? `<${tag}>` : tag;
+
+              suggestions.push({
+                label,
+                kind: monaco.languages.CompletionItemKind.Snippet,
+                insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                insertText: snippetText,
+                detail: preview,
+                documentation: {
+                  value: `**HTML \`<${tag}>\` Element**\n\n\`\`\`html\n${preview}\n\`\`\``,
+                },
+                range,
+                sortText: isExactMatch ? `!0000_${tag}` : `!0001_${tag}`,
+                filterText,
+                preselect: isExactMatch,
+              });
             }
           }
 
-          // 3. Dynamic custom components (e.g. Card, Modal, Sidebar)
-          if (word.word && word.word[0] === word.word[0].toUpperCase() && !COMMON_HTML_TAGS.includes(word.word)) {
+          // Dynamic support for custom React components (e.g. Card, Modal, Sidebar)
+          if (word.word && /^[A-Z][a-zA-Z0-9]*$/.test(word.word) && !COMMON_HTML_TAGS.includes(word.word)) {
             const comp = word.word;
             suggestions.push({
-              label: comp,
+              label: startsWithAngle ? `<${comp}>` : comp,
               kind: monaco.languages.CompletionItemKind.Snippet,
               insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
               insertText: `<${comp}>$0</${comp}>`,
@@ -280,12 +372,13 @@ export function registerHtmlJsxTagCompletion(monaco: typeof Monaco): void {
                 value: `**Component \`<${comp}>\`**\n\n\`\`\`tsx\n<${comp}>\n  $0\n</${comp}>\n\`\`\``,
               },
               range,
-              sortText: "!0000_" + comp,
-              filterText: comp,
+              sortText: `!0000_${comp}`,
+              filterText: startsWithAngle ? `<${comp}` : comp,
+              preselect: true,
             });
 
             suggestions.push({
-              label: `${comp} /`,
+              label: startsWithAngle ? `<${comp} />` : `${comp} /`,
               kind: monaco.languages.CompletionItemKind.Snippet,
               insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
               insertText: `<${comp} $0/>`,
@@ -294,8 +387,8 @@ export function registerHtmlJsxTagCompletion(monaco: typeof Monaco): void {
                 value: `**Self-closing \`<${comp} />\`**\n\n\`\`\`tsx\n<${comp} />\n\`\`\``,
               },
               range,
-              sortText: "!0001_" + comp,
-              filterText: comp,
+              sortText: `!0001_${comp}`,
+              filterText: startsWithAngle ? `<${comp}` : comp,
             });
           }
         }
@@ -312,7 +405,7 @@ export function registerHtmlJsxTagCompletion(monaco: typeof Monaco): void {
  * Binds Tab key for Emmet expansion when the autocomplete suggestion widget is NOT visible.
  * If text before the cursor is a valid Emmet abbreviation (e.g. div.container, ul>li*3),
  * it expands it directly using Monaco's snippet controller.
- * Otherwise, it falls back to normal Tab indentation.
+ * Otherwise, it falls back to normal Tab indentation without recursion.
  */
 export function setupEmmetTabExpansion(
   editor: Monaco.editor.IStandaloneCodeEditor,
@@ -331,7 +424,14 @@ export function setupEmmetTabExpansion(
 
       if (extracted) {
         // Expand using Monaco's built-in snippet controller
-        const snippetController = (editor as unknown as { getContribution: (id: string) => { insert?: (s: string, opts?: { range?: Monaco.Range }) => void } }).getContribution("snippetController2");
+        const snippetController = (
+          editor as unknown as {
+            getContribution: (id: string) => {
+              insert?: (s: string, opts?: { range?: Monaco.Range; overwriteBefore?: number }) => void;
+            };
+          }
+        ).getContribution("snippetController2");
+
         const range = new monaco.Range(
           position.lineNumber,
           extracted.startColumn,
@@ -345,13 +445,18 @@ export function setupEmmetTabExpansion(
         }
 
         // Fallback: execute edits and place cursor
-        const cleanText = extracted.expanded.replace(/\$\{\d+(?::([^}]+))?\}/g, "$1").replace(/\$\d+/g, "");
+        const cleanText = extracted.expanded
+          .replace(/\$\{\d+(?::([^}]+))?\}/g, "$1")
+          .replace(/\$\d+/g, "");
         editor.executeEdits("emmet-expand", [{ range, text: cleanText }]);
         return;
       }
 
-      // Normal Tab indentation fallback
-      editor.trigger("keyboard", "tab", null);
+      // Normal Tab indentation fallback (insert configured spaces or tab character)
+      const tabSize = model.getOptions().tabSize || 2;
+      const insertSpaces = model.getOptions().insertSpaces;
+      const indentStr = insertSpaces ? " ".repeat(tabSize) : "\t";
+      editor.trigger("keyboard", "type", { text: indentStr });
     },
     "!suggestWidgetVisible"
   );
@@ -380,13 +485,15 @@ export function setupAutoCloseTagOnTyping(
         if (!position) continue;
 
         const lineContent = model.getLineContent(position.lineNumber);
-        const textBefore = lineContent.substring(0, position.column - 1);
+        const textBefore = lineContent.substring(0, position.column);
 
-        if (textBefore.endsWith("/>") || textBefore.includes("</")) {
+        // Don't auto-close self-closing tags (/>) or closing tags (</...)
+        if (textBefore.endsWith("/>") || /<\/[a-zA-Z0-9_\-]*>$/.test(textBefore)) {
           continue;
         }
 
-        const match = textBefore.match(/<([a-zA-Z][a-zA-Z0-9_\-]*)(?:\s+[^<>]*)?$/);
+        // Match opening tag ending with >
+        const match = textBefore.match(/<([a-zA-Z][a-zA-Z0-9_\-]*)(?:\s+[^<>]*)?>$/);
         if (match) {
           const tagName = match[1];
           if (VOID_ELEMENTS.has(tagName.toLowerCase())) {
@@ -406,6 +513,7 @@ export function setupAutoCloseTagOnTyping(
             },
           ]);
 
+          // Keep cursor between opening and closing tag
           editor.setPosition(position);
         }
       }

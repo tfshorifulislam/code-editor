@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
-import type { OnMount } from "@monaco-editor/react";
+import type { OnMount, BeforeMount } from "@monaco-editor/react";
 import type * as Monaco from "monaco-editor";
 import { ProjectFile, EditorSettings, Project } from "@/types/editor";
 import { configureMonacoTypeScript } from "@/lib/monaco/typescriptService";
@@ -47,6 +47,11 @@ export default function MonacoEditorComponent({
   const monacoRef = useRef<typeof Monaco | null>(null);
   const autoCloseDisposableRef = useRef<Monaco.IDisposable | null>(null);
   const emmetTabDisposableRef = useRef<Monaco.IDisposable | null>(null);
+
+  const handleBeforeMount: BeforeMount = (monaco) => {
+    monacoRef.current = monaco;
+    registerHtmlJsxTagCompletion(monaco);
+  };
 
   const handleEditorMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
@@ -102,12 +107,16 @@ export default function MonacoEditorComponent({
       suggest: {
         showSnippets: true,
         snippetsPreventQuickSuggestions: false,
+        localityBonus: true,
+        shareSuggestSelections: true,
+        showIcons: true,
       },
       quickSuggestions: {
         other: true,
         comments: true,
         strings: true,
       },
+      quickSuggestionsDelay: 10,
       acceptSuggestionOnEnter: "on",
       suggestSelection: "first",
       parameterHints: {
@@ -225,6 +234,7 @@ export default function MonacoEditorComponent({
         path={fileUriString}
         value={activeFile.content}
         onChange={(value) => onChange(value || "")}
+        beforeMount={handleBeforeMount}
         onMount={handleEditorMount}
         options={{
           automaticLayout: true,
@@ -247,12 +257,16 @@ export default function MonacoEditorComponent({
           suggest: {
             showSnippets: true,
             snippetsPreventQuickSuggestions: false,
+            localityBonus: true,
+            shareSuggestSelections: true,
+            showIcons: true,
           },
           quickSuggestions: {
             other: true,
             comments: true,
             strings: true,
           },
+          quickSuggestionsDelay: 10,
           acceptSuggestionOnEnter: "on",
           suggestSelection: "first",
           parameterHints: {
