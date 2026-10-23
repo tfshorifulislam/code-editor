@@ -187,6 +187,7 @@ export default function PreviewPanel({
             <>
               <button
                 type="button"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={handleRefresh}
                 title="Reload preview"
                 className="p-1 hover:text-white rounded hover:bg-[#333333] transition cursor-pointer"
@@ -195,6 +196,7 @@ export default function PreviewPanel({
               </button>
               <button
                 type="button"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={handleRestartServer}
                 disabled={isActionLoading}
                 title="Restart dev server process"
@@ -204,6 +206,7 @@ export default function PreviewPanel({
               </button>
               <button
                 type="button"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={handleStopServer}
                 disabled={isActionLoading}
                 title="Stop dev server process"
@@ -215,6 +218,7 @@ export default function PreviewPanel({
           ) : (
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={previewMode === "devserver" ? handleStartServer : handleRefresh}
               disabled={isActionLoading}
               title={previewMode === "devserver" ? "Start dev server process" : "Reload preview"}
@@ -272,6 +276,7 @@ export default function PreviewPanel({
         <div className="hidden sm:flex items-center bg-[#1e1e1e] p-0.5 rounded border border-[#333333]">
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => setDeviceMode("desktop")}
             title="Desktop view"
             className={`p-1 rounded transition cursor-pointer ${
@@ -284,6 +289,7 @@ export default function PreviewPanel({
           </button>
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => setDeviceMode("tablet")}
             title="Tablet view (768px)"
             className={`p-1 rounded transition cursor-pointer ${
@@ -296,6 +302,7 @@ export default function PreviewPanel({
           </button>
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => setDeviceMode("mobile")}
             title="Mobile view (375px)"
             className={`p-1 rounded transition cursor-pointer ${
@@ -314,6 +321,7 @@ export default function PreviewPanel({
           <div className="hidden lg:flex items-center bg-[#1e1e1e] p-0.5 rounded border border-[#333333] text-[10px] font-sans font-medium">
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => setPreviewMode("devserver")}
               className={`px-2 py-0.5 rounded transition cursor-pointer ${
                 previewMode === "devserver"
@@ -325,6 +333,7 @@ export default function PreviewPanel({
             </button>
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => setPreviewMode("compiler")}
               className={`px-2 py-0.5 rounded transition cursor-pointer ${
                 previewMode === "compiler"
@@ -338,6 +347,7 @@ export default function PreviewPanel({
 
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={handleOpenExternal}
             title="Open in new window"
             className="p-1.5 hover:text-white text-neutral-400 rounded hover:bg-[#333333] transition cursor-pointer"
@@ -346,6 +356,7 @@ export default function PreviewPanel({
           </button>
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={onClose}
             title="Close Preview panel"
             className="p-1.5 hover:text-white text-neutral-400 rounded hover:bg-[#333333] transition cursor-pointer"
@@ -429,6 +440,7 @@ export default function PreviewPanel({
                 <div className="pt-2 flex flex-col gap-2">
                   <button
                     type="button"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={handleStartServer}
                     disabled={isActionLoading}
                     className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-950/40"
@@ -443,6 +455,7 @@ export default function PreviewPanel({
 
                   <button
                     type="button"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => setPreviewMode("compiler")}
                     className="text-[11px] text-neutral-400 hover:text-white py-1 transition cursor-pointer"
                   >

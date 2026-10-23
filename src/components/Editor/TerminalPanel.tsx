@@ -44,7 +44,7 @@ interface ActiveSessionHandle {
   hasReceivedInitBuffer?: boolean;
 }
 
-export default function TerminalPanel({
+function TerminalPanel({
   isOpen,
   onToggle,
   activeTab,
@@ -73,6 +73,11 @@ export default function TerminalPanel({
   // Map of active xterm sessions: sessionId -> ActiveSessionHandle
   const sessionsMapRef = useRef<Map<string, ActiveSessionHandle>>(new Map());
   const masterContainerRef = useRef<HTMLDivElement>(null);
+
+  const onFilesSyncedRef = useRef(onFilesSynced);
+  useEffect(() => {
+    onFilesSyncedRef.current = onFilesSynced;
+  }, [onFilesSynced]);
 
   // Load available sessions and shells from backend
   const loadSessionsData = useCallback(async () => {
@@ -151,8 +156,8 @@ export default function TerminalPanel({
                     const event = JSON.parse(trimmed.slice(6));
                     if (event.type === "output" && typeof event.data === "string") {
                       term.write(event.data);
-                    } else if (event.type === "sync" && event.updatedFiles && onFilesSynced) {
-                      onFilesSynced(event.updatedFiles);
+                    } else if (event.type === "sync" && event.updatedFiles && onFilesSyncedRef.current) {
+                      onFilesSyncedRef.current(event.updatedFiles);
                     }
                   } catch {}
                 }
@@ -190,8 +195,8 @@ export default function TerminalPanel({
               }
             } else if (msg.type === "output" && typeof msg.data === "string") {
               term.write(msg.data);
-            } else if (msg.type === "sync" && msg.updatedFiles && onFilesSynced) {
-              onFilesSynced(msg.updatedFiles);
+            } else if (msg.type === "sync" && msg.updatedFiles && onFilesSyncedRef.current) {
+              onFilesSyncedRef.current(msg.updatedFiles);
             }
           } catch (err) {
             console.warn("WebSocket parse error:", err);
@@ -240,7 +245,7 @@ export default function TerminalPanel({
         }
       });
     },
-    [project.id, wsPort, onFilesSynced]
+    [project.id, wsPort]
   );
 
   // Initialize or reveal active xterm instance
@@ -348,14 +353,13 @@ export default function TerminalPanel({
         setTimeout(() => {
           try {
             h.fitAddon.fit();
-            h.term.focus();
           } catch {}
         }, 50);
       } else {
         h.containerEl.style.display = "none";
       }
     });
-  }, [isOpen, activeTab, activeSessionId, sessions, setupSessionConnection]);
+  }, [isOpen, activeTab, activeSessionId, setupSessionConnection]);
 
   // Handle Window Resize
   useEffect(() => {
@@ -410,6 +414,9 @@ export default function TerminalPanel({
       const res = await cloudApi.terminal.createSession(project.id, shellType);
       await loadSessionsData();
       setActiveSessionId(res.session.id);
+      setTimeout(() => {
+        sessionsMapRef.current.get(res.session.id)?.term.focus();
+      }, 50);
     } catch (err) {
       console.warn("Failed to create session:", err);
     }
@@ -544,7 +551,12 @@ export default function TerminalPanel({
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => onSelectTab("terminal")}
+            onClick={() => {
+              onSelectTab("terminal");
+              if (activeSessionId) {
+                sessionsMapRef.current.get(activeSessionId)?.term.focus();
+              }
+            }}
             className={`flex items-center gap-1.5 py-1 px-2.5 rounded-t font-medium transition cursor-pointer text-xs ${
               activeTab === "terminal"
                 ? "bg-[#181818] text-white border-t-2 border-t-[var(--color-primary)] font-semibold"
@@ -598,7 +610,10 @@ export default function TerminalPanel({
               return (
                 <div
                   key={sess.id}
-                  onClick={() => setActiveSessionId(sess.id)}
+                  onClick={() => {
+                    setActiveSessionId(sess.id);
+                    sessionsMapRef.current.get(sess.id)?.term.focus();
+                  }}
                   onDoubleClick={() => {
                     setEditingSessionId(sess.id);
                     setEditingName(sess.name);
@@ -810,3 +825,5 @@ export default function TerminalPanel({
     </div>
   );
 }
+
+export default React.memo(TerminalPanel);

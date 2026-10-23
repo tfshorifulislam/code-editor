@@ -66,6 +66,7 @@ interface EditorLayoutProps {
 export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
   const router = useRouter();
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const inMemoryFileContentsRef = useRef<Map<string, string>>(new Map());
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved" | "error">("saved");
 
   // 1. Core Cloud Project State
@@ -220,19 +221,22 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
           const updatedVersion = res.file.version;
           setActiveProject((prev) => {
             if (!prev) return null;
+            const currentInMemory = inMemoryFileContentsRef.current.get(fileId) ?? content;
             return {
               ...prev,
               files: prev.files.map((f) =>
-                f.id === fileId ? { ...f, content, version: updatedVersion } : f
+                f.id === fileId ? { ...f, content: currentInMemory, version: updatedVersion } : f
               ),
               updatedAt: getTimestamp(),
             };
           });
         }
 
-        setSaveStatus("saved");
-        setUnsavedFiles((prev) => ({ ...prev, [fileId]: false }));
-        setPreviewRefreshKey((k) => k + 1);
+        const latestInMemory = inMemoryFileContentsRef.current.get(fileId) ?? content;
+        if (latestInMemory === content) {
+          setSaveStatus("saved");
+          setUnsavedFiles((prev) => ({ ...prev, [fileId]: false }));
+        }
       } catch (err) {
         setSaveStatus("error");
         setConsoleMessages((prev) => [
@@ -249,34 +253,29 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
     [activeProject]
   );
 
-  const handleContentChange = (newContent: string) => {
-    if (!activeProject || !activeFile) return;
+  const handleContentChange = useCallback(
+    (newContent: string) => {
+      if (!activeProject || !activeFile) return;
 
-    setSaveStatus("unsaved");
-    setUnsavedFiles((prev) => ({ ...prev, [activeFile.id]: true }));
+      inMemoryFileContentsRef.current.set(activeFile.id, newContent);
+      setSaveStatus("unsaved");
+      setUnsavedFiles((prev) => (prev[activeFile.id] ? prev : { ...prev, [activeFile.id]: true }));
 
-    // Keep active file in React state responsive
-    setActiveProject((prev) => {
-      if (!prev) return null;
-      return {
-        ...prev,
-        files: prev.files.map((f) =>
-          f.id === activeFile.id ? { ...f, content: newContent } : f
-        ),
-      };
-    });
-
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => {
-      performCloudSave(activeFile.id, newContent);
-    }, 1000);
-  };
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = setTimeout(() => {
+        const latest = inMemoryFileContentsRef.current.get(activeFile.id) ?? newContent;
+        performCloudSave(activeFile.id, latest);
+      }, 1000);
+    },
+    [activeProject, activeFile, performCloudSave]
+  );
 
   const handleSaveActiveFile = useCallback(() => {
     if (!activeProject || !activeFile) return;
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
-    performCloudSave(activeFile.id, activeFile.content);
+    const latest = inMemoryFileContentsRef.current.get(activeFile.id) ?? activeFile.content;
+    performCloudSave(activeFile.id, latest);
     setConsoleMessages((prev) => [
       ...prev,
       {
@@ -296,7 +295,8 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
 
       // If switching away from an unsaved file, flush save immediately
       if (activeFile && unsavedFiles[activeFile.id]) {
-        performCloudSave(activeFile.id, activeFile.content);
+        const latest = inMemoryFileContentsRef.current.get(activeFile.id) ?? activeFile.content;
+        performCloudSave(activeFile.id, latest);
       }
 
       const nextOpen = activeProject.openFileIds.includes(fileId)
@@ -305,8 +305,16 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
 
       setActiveProject((prev) => {
         if (!prev) return null;
+        // Merge any in-memory buffer edits into files
+        const mergedFiles = prev.files.map((f) => {
+          if (inMemoryFileContentsRef.current.has(f.id)) {
+            return { ...f, content: inMemoryFileContentsRef.current.get(f.id)! };
+          }
+          return f;
+        });
         return {
           ...prev,
+          files: mergedFiles,
           activeFileId: fileId,
           openFileIds: nextOpen,
           updatedAt: getTimestamp(),
@@ -323,8 +331,10 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
     // If tab being closed has unsaved changes, flush save
     const closingFile = activeProject.files.find((f) => f.id === fileId);
     if (closingFile && unsavedFiles[fileId]) {
-      performCloudSave(fileId, closingFile.content);
+      const latest = inMemoryFileContentsRef.current.get(fileId) ?? closingFile.content;
+      performCloudSave(fileId, latest);
     }
+    inMemoryFileContentsRef.current.delete(fileId);
 
     const nextOpen = activeProject.openFileIds.filter((id) => id !== fileId);
     let nextActive = activeProject.activeFileId;
@@ -548,12 +558,49 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
     ]);
   };
 
+  const unsavedFilesRef = useRef<Record<string, boolean>>({});
+  useEffect(() => {
+    unsavedFilesRef.current = unsavedFiles;
+  }, [unsavedFiles]);
+
+  const handleCursorChange = useCallback((line: number, column: number) => {
+    setCursorPos({ line, column });
+  }, []);
+
+  const handleClearConsole = useCallback(() => {
+    setConsoleMessages([]);
+  }, []);
+
+  const handleToggleTerminal = useCallback(() => {
+    setIsTerminalOpen((prev) => !prev);
+  }, []);
+
+  const handleCloseTerminal = useCallback(() => {
+    setIsTerminalOpen(false);
+  }, []);
+
+  const handleSelectTerminalTab = useCallback((tab: BottomTab) => {
+    setTerminalTab(tab);
+  }, []);
+
   const handleFilesSynced = useCallback((updatedFiles: ProjectFile[]) => {
     setActiveProject((prev) => {
       if (!prev) return null;
+      const currentActiveId = prev.activeFileId;
+      // Do not overwrite any file that has pending in-memory edits or unsaved state
+      const merged = updatedFiles.map((newFile) => {
+        if (inMemoryFileContentsRef.current.has(newFile.id)) {
+          return { ...newFile, content: inMemoryFileContentsRef.current.get(newFile.id)! };
+        }
+        if (newFile.id === currentActiveId && unsavedFilesRef.current[currentActiveId]) {
+          const currentFile = prev.files.find((f) => f.id === currentActiveId);
+          return currentFile || newFile;
+        }
+        return newFile;
+      });
       return {
         ...prev,
-        files: updatedFiles,
+        files: merged,
         updatedAt: getTimestamp(),
       };
     });
@@ -834,6 +881,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
           {/* Run Preview Button */}
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={handleRunPreview}
             title={isPreviewOpen ? "Run / Refresh Preview (F5)" : "Run Preview (F5)"}
             className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-semibold transition cursor-pointer shadow-xs ${
@@ -1030,18 +1078,18 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
               settings={settings}
               onChange={handleContentChange}
               onSave={handleSaveActiveFile}
-              onCursorChange={(line, column) => setCursorPos({ line, column })}
+              onCursorChange={handleCursorChange}
             />
           </div>
 
           {/* Bottom Integrated Terminal & Console Panel */}
           <TerminalPanel
             isOpen={isTerminalOpen}
-            onToggle={() => setIsTerminalOpen(false)}
+            onToggle={handleCloseTerminal}
             activeTab={terminalTab}
-            onSelectTab={(tab) => setTerminalTab(tab)}
+            onSelectTab={handleSelectTerminalTab}
             consoleMessages={consoleMessages}
-            onClearConsole={() => setConsoleMessages([])}
+            onClearConsole={handleClearConsole}
             project={activeProject}
             onFilesSynced={handleFilesSynced}
           />
@@ -1078,7 +1126,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
       <StatusBar
         activeFile={activeFile}
         cursorPos={cursorPos}
-        onToggleTerminal={() => setIsTerminalOpen((prev) => !prev)}
+        onToggleTerminal={handleToggleTerminal}
         isTerminalOpen={isTerminalOpen}
         saveStatus={saveStatus}
       />

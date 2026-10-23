@@ -35,7 +35,7 @@ interface MonacoEditorProps {
   onCursorChange?: (line: number, column: number) => void;
 }
 
-export default function MonacoEditorComponent({
+function MonacoEditorComponent({
   activeFile,
   project,
   settings,
@@ -47,6 +47,16 @@ export default function MonacoEditorComponent({
   const monacoRef = useRef<typeof Monaco | null>(null);
   const autoCloseDisposableRef = useRef<Monaco.IDisposable | null>(null);
   const emmetTabDisposableRef = useRef<Monaco.IDisposable | null>(null);
+  const viewStatesRef = useRef<Map<string, Monaco.editor.ICodeEditorViewState>>(new Map());
+  const activeFileIdRef = useRef<string | null>(activeFile?.id || null);
+  const lastProjectFilesRef = useRef<string>("");
+  const lastKnownContentRef = useRef<string>(activeFile?.content || "");
+
+  const handleEditorChange = (value: string | undefined) => {
+    const val = value || "";
+    lastKnownContentRef.current = val;
+    onChange(val);
+  };
 
   const handleBeforeMount: BeforeMount = (monaco) => {
     monacoRef.current = monaco;
@@ -56,6 +66,14 @@ export default function MonacoEditorComponent({
   const handleEditorMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
+
+    // Restore saved view state if switching back to an already opened file
+    if (activeFile?.id && viewStatesRef.current.has(activeFile.id)) {
+      const savedVs = viewStatesRef.current.get(activeFile.id);
+      if (savedVs) {
+        editor.restoreViewState(savedVs);
+      }
+    }
 
     // Configure TypeScript language service and workspace models
     if (project) {
@@ -186,11 +204,62 @@ export default function MonacoEditorComponent({
     }
   }, [settings]);
 
-  // Synchronize TypeScript language service and workspace models whenever project changes
+  // Preserve and restore view state across file transitions
   useEffect(() => {
-    if (monacoRef.current && project) {
-      configureMonacoTypeScript(monacoRef.current, project);
+    const editor = editorRef.current;
+    if (!editor || !activeFile) return;
+
+    if (activeFileIdRef.current && activeFileIdRef.current !== activeFile.id) {
+      // Save outgoing file view state (cursor, scroll, selection)
+      const currentVs = editor.saveViewState();
+      if (currentVs) {
+        viewStatesRef.current.set(activeFileIdRef.current, currentVs);
+      }
+      activeFileIdRef.current = activeFile.id;
+      lastKnownContentRef.current = activeFile.content;
+
+      // Restore incoming file view state if cached
+      const targetVs = viewStatesRef.current.get(activeFile.id);
+      if (targetVs) {
+        editor.restoreViewState(targetVs);
+      }
+    } else {
+      activeFileIdRef.current = activeFile.id;
+      lastKnownContentRef.current = activeFile.content;
     }
+  }, [activeFile?.id]);
+
+  // Handle genuine external updates (e.g. AI Assistant diff, file revert)
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor || !activeFile) return;
+
+    // If activeFile.content changed externally and differs from the current buffer
+    if (activeFile.content !== lastKnownContentRef.current) {
+      lastKnownContentRef.current = activeFile.content;
+      const model = editor.getModel();
+      if (model && model.getValue() !== activeFile.content) {
+        const viewState = editor.saveViewState();
+        model.pushEditOperations(
+          [],
+          [{ range: model.getFullModelRange(), text: activeFile.content }],
+          () => null
+        );
+        if (viewState) {
+          editor.restoreViewState(viewState);
+        }
+      }
+    }
+  }, [activeFile?.content]);
+
+  // Synchronize TypeScript language service and workspace models ONLY when files list changes
+  useEffect(() => {
+    if (!monacoRef.current || !project) return;
+    const fileListSig = project.files.map((f) => `${f.id}:${f.path}:${f.isFolder ? "d" : "f"}`).join(";");
+    if (fileListSig === lastProjectFilesRef.current) return;
+    lastProjectFilesRef.current = fileListSig;
+
+    configureMonacoTypeScript(monacoRef.current, project);
   }, [project]);
 
   if (!activeFile) {
@@ -248,8 +317,8 @@ export default function MonacoEditorComponent({
         theme={settings.theme === "vs-dark" ? "vs-dark" : "light"}
         language={getLanguage(activeFile)}
         path={fileUriString}
-        value={activeFile.content}
-        onChange={(value) => onChange(value || "")}
+        defaultValue={activeFile.content}
+        onChange={handleEditorChange}
         beforeMount={handleBeforeMount}
         onMount={handleEditorMount}
         options={{
@@ -315,4 +384,6 @@ export default function MonacoEditorComponent({
     </div>
   );
 }
+
+export default React.memo(MonacoEditorComponent);
 

@@ -393,8 +393,6 @@ export function configureMonacoTypeScript(monaco: typeof Monaco, project: Projec
       const ext = file.name.split(".").pop()?.toLowerCase();
       const language = ext === "tsx" || ext === "ts" ? "typescript" : ext === "jsx" || ext === "js" ? "javascript" : ext === "json" ? "json" : ext === "css" ? "css" : ext === "html" ? "html" : "plaintext";
       model = monaco.editor.createModel(file.content, language, fileUri);
-    } else if (model.getValue() !== file.content) {
-      model.setValue(file.content);
     }
   }
 }
