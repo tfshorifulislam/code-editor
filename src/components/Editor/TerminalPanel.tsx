@@ -308,24 +308,14 @@ function TerminalPanel({
       term.loadAddon(fitAddon);
       term.loadAddon(new WebLinksAddon());
 
-      // Clipboard and shortcut integration
+      // Clipboard and shortcut integration:
+      // Allow browser native Copy (Ctrl+C / Cmd+C when text is highlighted)
+      // and native Paste (Ctrl+V / Cmd+V) to flow into xterm's built-in textarea paste handler.
       term.attachCustomKeyEventHandler((event: KeyboardEvent) => {
-        // If Ctrl+C (or Cmd+C) pressed and text is highlighted, allow browser copy
         if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "c" && term.hasSelection()) {
           return false;
         }
-        // If Ctrl+V (or Cmd+V) pressed, paste from clipboard
-        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "v" && event.type === "keydown") {
-          navigator.clipboard?.readText?.().then((text) => {
-            if (text) {
-              const currentHandle = sessionsMapRef.current.get(activeSessionId);
-              if (currentHandle?.ws && currentHandle.ws.readyState === WebSocket.OPEN) {
-                currentHandle.ws.send(JSON.stringify({ type: "input", data: text }));
-              } else {
-                cloudApi.terminal.sendSessionInput(project.id, activeSessionId, text);
-              }
-            }
-          }).catch(() => {});
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "v") {
           return false;
         }
         return true;
@@ -513,13 +503,11 @@ function TerminalPanel({
     e.preventDefault();
     if (!activeSessionId) return;
     try {
-      const text = await navigator.clipboard.readText();
+      const text = await navigator.clipboard?.readText?.();
       if (text) {
         const handle = sessionsMapRef.current.get(activeSessionId);
-        if (handle?.ws && handle.ws.readyState === WebSocket.OPEN) {
-          handle.ws.send(JSON.stringify({ type: "input", data: text }));
-        } else {
-          cloudApi.terminal.sendSessionInput(project.id, activeSessionId, text);
+        if (handle) {
+          handle.term.paste(text);
         }
       }
     } catch {}

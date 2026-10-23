@@ -209,17 +209,14 @@ export default function NewProjectDialog({
               }
             });
 
-            // Clipboard and shortcut integration
+            // Clipboard and shortcut integration:
+            // Allow browser native Copy (Ctrl+C / Cmd+C when text is highlighted)
+            // and native Paste (Ctrl+V / Cmd+V) to flow into xterm's built-in textarea paste handler.
             term.attachCustomKeyEventHandler((event: KeyboardEvent) => {
               if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "c" && term.hasSelection()) {
                 return false;
               }
-              if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "v" && event.type === "keydown") {
-                navigator.clipboard?.readText?.().then((text) => {
-                  if (text && ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ type: "input", data: text }));
-                  }
-                }).catch(() => {});
+              if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "v") {
                 return false;
               }
               return true;
@@ -312,6 +309,16 @@ export default function NewProjectDialog({
     onClose();
   };
 
+  const handleContextMenu = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    try {
+      const text = await navigator.clipboard?.readText?.();
+      if (text && xtermRef.current) {
+        xtermRef.current.paste(text);
+      }
+    } catch {}
+  };
+
   if (!isOpen) return null;
 
   const topDetected = detectedProjects[0];
@@ -341,6 +348,7 @@ export default function NewProjectDialog({
 
         {/* Pure xterm.js Terminal Window Container */}
         <div
+          onContextMenu={handleContextMenu}
           className="flex-1 min-h-[360px] max-h-[520px] p-2.5 bg-[#0c0d14] relative overflow-hidden cursor-text select-text"
           onClick={() => xtermRef.current?.focus()}
         >
