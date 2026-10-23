@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkRateLimit, getClientIp } from "@/lib/server/rateLimit";
 
 interface FileContext {
   path: string;
@@ -9,15 +10,44 @@ interface FileContext {
 
 interface RequestBody {
   prompt: string;
+  provider?: "openai" | "anthropic" | "gemini";
   activeFile?: FileContext | null;
   relevantFiles?: FileContext[];
   history?: { role: string; content: string }[];
 }
 
+function sanitizeError(text: string, keys: (string | undefined)[]): string {
+  let sanitized = text;
+  for (const k of keys) {
+    if (k && k.length > 5) {
+      sanitized = sanitized.replaceAll(k, "[REDACTED]");
+    }
+  }
+  return sanitized;
+}
+
 export async function POST(req: NextRequest) {
   try {
+    const clientIp = getClientIp(req);
+    const rateCheck = checkRateLimit(clientIp, {
+      bucketName: "ai-completions",
+      windowMs: 60_000,
+      max: 20,
+    });
+
+    if (!rateCheck.success) {
+      const retryAfterSec = Math.ceil(rateCheck.resetMs / 1000);
+      return NextResponse.json(
+        { error: `Too many AI requests. Please wait ${retryAfterSec} seconds before trying again.` },
+        {
+          status: 429,
+          headers: { "Retry-After": String(retryAfterSec) },
+        }
+      );
+    }
+
     const body = (await req.json()) as RequestBody;
-    const { prompt, activeFile, relevantFiles = [], history = [] } = body;
+    const { prompt, provider, activeFile, relevantFiles = [], history = [] } = body;
 
     if (!prompt || typeof prompt !== "string") {
       return NextResponse.json(
@@ -30,17 +60,48 @@ export async function POST(req: NextRequest) {
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
     const geminiKey = process.env.GEMINI_API_KEY;
 
-    // Check if an AI provider key is configured
+    // If an explicit provider was selected by the client
+    if (provider === "openai") {
+      if (!openaiKey) {
+        return NextResponse.json(
+          { error: "OpenAI is not configured. Please set OPENAI_API_KEY." },
+          { status: 400 }
+        );
+      }
+      return await handleOpenAI(openaiKey, prompt, activeFile, relevantFiles, history);
+    }
+
+    if (provider === "anthropic") {
+      if (!anthropicKey) {
+        return NextResponse.json(
+          { error: "Anthropic is not configured. Please set ANTHROPIC_API_KEY." },
+          { status: 400 }
+        );
+      }
+      return await handleAnthropic(anthropicKey, prompt, activeFile, relevantFiles, history);
+    }
+
+    if (provider === "gemini") {
+      if (!geminiKey) {
+        return NextResponse.json(
+          { error: "Gemini is not configured. Please set GEMINI_API_KEY." },
+          { status: 400 }
+        );
+      }
+      return await handleGemini(geminiKey, prompt, activeFile, relevantFiles, history);
+    }
+
+    // Default fallback priority cascade
+    if (geminiKey) {
+      return await handleGemini(geminiKey, prompt, activeFile, relevantFiles, history);
+    }
+
     if (openaiKey) {
       return await handleOpenAI(openaiKey, prompt, activeFile, relevantFiles, history);
     }
 
     if (anthropicKey) {
       return await handleAnthropic(anthropicKey, prompt, activeFile, relevantFiles, history);
-    }
-
-    if (geminiKey) {
-      return await handleGemini(geminiKey, prompt, activeFile, relevantFiles, history);
     }
 
     // Provider key not set: Return clear setup state & helpful contextual response
@@ -113,7 +174,7 @@ ${relevantFiles
   if (!res.ok) {
     const errText = await res.text();
     return NextResponse.json(
-      { error: `OpenAI provider error (${res.status}): ${errText}` },
+      { error: `OpenAI provider error (${res.status}): ${sanitizeError(errText, [apiKey])}` },
       { status: res.status }
     );
   }
@@ -139,6 +200,7 @@ async function handleAnthropic(
   history: { role: string; content: string }[]
 ) {
   const model = process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-20241022";
+  const workspaceId = process.env.ANTHROPIC_WORKSPACE_ID;
 
   const systemPrompt = `You are Code Editor AI, an expert developer in an online IDE.
 If code modifications are requested, include proposed file diffs in a JSON block at the end:
@@ -165,13 +227,18 @@ ${activeFile ? `\nContents:\n\`\`\`\n${activeFile.content}\n\`\`\`` : ""}
     { role: "user" as const, content: prompt },
   ];
 
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "x-api-key": apiKey,
+    "anthropic-version": "2023-06-01",
+  };
+  if (workspaceId) {
+    headers["anthropic-workspace-id"] = workspaceId;
+  }
+
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
+    headers,
     body: JSON.stringify({
       model,
       system: systemPrompt,
@@ -183,7 +250,7 @@ ${activeFile ? `\nContents:\n\`\`\`\n${activeFile.content}\n\`\`\`` : ""}
   if (!res.ok) {
     const errText = await res.text();
     return NextResponse.json(
-      { error: `Anthropic provider error (${res.status}): ${errText}` },
+      { error: `Anthropic provider error (${res.status}): ${sanitizeError(errText, [apiKey, workspaceId])}` },
       { status: res.status }
     );
   }
@@ -207,8 +274,8 @@ async function handleGemini(
   relevantFiles: FileContext[],
   history: { role: string; content: string }[]
 ) {
-  const model = process.env.GEMINI_MODEL || "gemini-1.5-flash";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const model = process.env.GEMINI_MODEL || "gemini-3.5-flash";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
   const promptText = `You are Code Editor AI in an online IDE.
 User prompt: ${prompt}
@@ -236,7 +303,10 @@ If you propose file changes, include them in a valid JSON block at the end:
 
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": apiKey,
+    },
     body: JSON.stringify({
       contents: [{ parts: [{ text: promptText }] }],
     }),
@@ -245,7 +315,7 @@ If you propose file changes, include them in a valid JSON block at the end:
   if (!res.ok) {
     const errText = await res.text();
     return NextResponse.json(
-      { error: `Gemini provider error (${res.status}): ${errText}` },
+      { error: `Gemini provider error (${res.status}): ${sanitizeError(errText, [apiKey])}` },
       { status: res.status }
     );
   }

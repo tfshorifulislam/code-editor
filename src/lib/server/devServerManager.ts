@@ -4,6 +4,7 @@ import net from "net";
 import path from "path";
 import fsp from "fs/promises";
 import { getWorkspaceDir } from "./workspaceDisk";
+import { getSanitizedWorkspaceEnv } from "./workspaceEnv";
 
 export type ProjectFramework = "nextjs" | "vite" | "node" | "static" | "python" | "unknown";
 export type DevServerStatus = "stopped" | "starting" | "running" | "error";
@@ -254,11 +255,9 @@ export async function startDevServer(projectId: string): Promise<DevServerInstan
   const child = spawn(cmd, args, {
     cwd: workspaceDir,
     shell: isWindows,
-    env: {
-      ...process.env,
+    env: getSanitizedWorkspaceEnv(projectId, workspaceDir, {
       PORT: String(port),
-      NODE_ENV: "development",
-    },
+    }),
   });
 
   instance.childProcess = child;

@@ -23,13 +23,56 @@ export function getWorkspaceDir(projectId: string): string {
 
 /**
  * Validates that a file path resolves strictly inside the project's workspace directory.
+ * Defends against directory traversal (../), absolute escapes, null bytes, and symlinks.
  */
 export function resolveSafePath(projectId: string, relativePath: string): string {
+  if (!relativePath || typeof relativePath !== "string") {
+    throw new Error("Invalid relative path.");
+  }
+
+  // Reject null bytes
+  if (relativePath.includes("\0")) {
+    throw new Error(`Security Violation: Null byte detected in path: ${relativePath}`);
+  }
+
   const workspaceDir = path.resolve(getWorkspaceDir(projectId));
   const target = path.resolve(workspaceDir, relativePath);
 
+  // Lexical path traversal check
   if (target !== workspaceDir && !target.startsWith(workspaceDir + path.sep)) {
     throw new Error(`Security Violation: Path traversal outside workspace: ${relativePath}`);
+  }
+
+  // Physical symlink check
+  try {
+    const realWorkspace = fs.existsSync(workspaceDir) ? fs.realpathSync(workspaceDir) : workspaceDir;
+
+    if (fs.existsSync(target)) {
+      const realTarget = fs.realpathSync(target);
+      if (realTarget !== realWorkspace && !realTarget.startsWith(realWorkspace + path.sep)) {
+        throw new Error(`Security Violation: Symlink points outside workspace: ${relativePath}`);
+      }
+    } else {
+      // For paths that do not exist yet, verify that existing parent directories are not symlinks escaping workspace
+      let current = path.dirname(target);
+      while (current.length >= workspaceDir.length) {
+        if (fs.existsSync(current)) {
+          const realAncestor = fs.realpathSync(current);
+          if (realAncestor !== realWorkspace && !realAncestor.startsWith(realWorkspace + path.sep)) {
+            throw new Error(`Security Violation: Ancestor directory symlink escapes workspace: ${relativePath}`);
+          }
+          break;
+        }
+        const parent = path.dirname(current);
+        if (parent === current) break;
+        current = parent;
+      }
+    }
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message.startsWith("Security Violation")) {
+      throw err;
+    }
+    // ENOENT or normal fs race conditions are acceptable for new files
   }
 
   return target;
@@ -200,6 +243,20 @@ export async function syncDiskToDatabase(projectId: string): Promise<ProjectFile
 
       const relPath = relativeDir ? `${relativeDir}/${entry.name}` : entry.name;
       const fullPath = path.join(currentDir, entry.name);
+
+      // Defend against symlink escapes in directory traversal
+      if (entry.isSymbolicLink()) {
+        try {
+          const realEntry = fs.realpathSync(fullPath);
+          const realWorkspace = fs.realpathSync(workspaceDir);
+          if (realEntry !== realWorkspace && !realEntry.startsWith(realWorkspace + path.sep)) {
+            console.warn(`[Security] Ignored external symlink in workspace: ${relPath}`);
+            continue;
+          }
+        } catch {
+          continue;
+        }
+      }
 
       if (entry.isDirectory()) {
         diskFiles.push({

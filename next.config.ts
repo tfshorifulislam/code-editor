@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["esbuild"],
+  serverExternalPackages: ["esbuild", "node-pty"],
   /* config options here */
   experimental: {
     agentFeedback: true,

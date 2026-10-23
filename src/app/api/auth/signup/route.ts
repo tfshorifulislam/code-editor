@@ -4,9 +4,28 @@ import { hashPassword } from "@/lib/auth/passwords";
 import { signSessionToken } from "@/lib/auth/jwt";
 import { SESSION_COOKIE_NAME, SESSION_COOKIE_OPTIONS } from "@/lib/auth/session";
 import { seedStarterProjectsForUser } from "@/lib/server/projectService";
+import { checkRateLimit, getClientIp } from "@/lib/server/rateLimit";
 
 export async function POST(req: Request) {
   try {
+    const clientIp = getClientIp(req);
+    const rateCheck = checkRateLimit(clientIp, {
+      bucketName: "auth-signup",
+      windowMs: 60_000,
+      max: 10,
+    });
+
+    if (!rateCheck.success) {
+      const retryAfterSec = Math.ceil(rateCheck.resetMs / 1000);
+      return NextResponse.json(
+        { error: `Too many signup attempts. Please try again in ${retryAfterSec} seconds.` },
+        {
+          status: 429,
+          headers: { "Retry-After": String(retryAfterSec) },
+        }
+      );
+    }
+
     const body = await req.json();
     const { email, password, name } = body;
 

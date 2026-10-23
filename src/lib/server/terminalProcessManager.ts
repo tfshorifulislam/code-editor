@@ -2,6 +2,7 @@ import { spawn, ChildProcess, exec } from "child_process";
 import path from "path";
 import fsp from "fs/promises";
 import { getWorkspaceDir, resolveSafePath } from "./workspaceDisk";
+import { getSanitizedWorkspaceEnv } from "./workspaceEnv";
 
 interface ActiveProcessInfo {
   child: ChildProcess;
@@ -189,16 +190,12 @@ export function spawnCommandStream(
   const shell = isWindows ? (process.env.ComSpec || "cmd.exe") : "/bin/sh";
   const shellArgs = isWindows ? ["/d", "/s", "/c", command] : ["-c", command];
 
-  const child = spawn(shell, shellArgs, {
+  const child = spawn(/*turbopackIgnore: true*/ shell, shellArgs, {
     cwd: effectiveDir,
     windowsVerbatimArguments: isWindows,
-    env: {
-      ...process.env,
-      PROJECT_ID: projectId,
-      NODE_ENV: "development",
-      FORCE_COLOR: "1", // Enable rich ANSI color output for npm, vite, next
+    env: getSanitizedWorkspaceEnv(projectId, effectiveDir, {
       NPM_CONFIG_COLOR: "always",
-    },
+    }),
     stdio: ["pipe", "pipe", "pipe"],
   });
 

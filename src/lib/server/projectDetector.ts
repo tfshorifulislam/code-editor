@@ -78,15 +78,15 @@ async function inspectDirectoryForProject(
     const hasNextConfig =
       deps["next"] ||
       devDeps["next"] ||
-      (await fsp.access(path.join(dirPath, "next.config.ts")).then(() => true).catch(() => false)) ||
-      (await fsp.access(path.join(dirPath, "next.config.js")).then(() => true).catch(() => false)) ||
-      (await fsp.access(path.join(dirPath, "next.config.mjs")).then(() => true).catch(() => false)) ||
-      (await fsp.access(path.join(dirPath, "app", "page.tsx")).then(() => true).catch(() => false)) ||
-      (await fsp.access(path.join(dirPath, "src", "app", "page.tsx")).then(() => true).catch(() => false));
+      (await fsp.access(path.join(/*turbopackIgnore: true*/ dirPath, "next.config.ts")).then(() => true).catch(() => false)) ||
+      (await fsp.access(path.join(/*turbopackIgnore: true*/ dirPath, "next.config.js")).then(() => true).catch(() => false)) ||
+      (await fsp.access(path.join(/*turbopackIgnore: true*/ dirPath, "next.config.mjs")).then(() => true).catch(() => false)) ||
+      (await fsp.access(path.join(/*turbopackIgnore: true*/ dirPath, "app", "page.tsx")).then(() => true).catch(() => false)) ||
+      (await fsp.access(path.join(/*turbopackIgnore: true*/ dirPath, "src", "app", "page.tsx")).then(() => true).catch(() => false));
 
     if (hasNextConfig) {
       let entryFile = "app/page.tsx";
-      if (await fsp.access(path.join(dirPath, "src", "app", "page.tsx")).then(() => true).catch(() => false)) {
+      if (await fsp.access(path.join(/*turbopackIgnore: true*/ dirPath, "src", "app", "page.tsx")).then(() => true).catch(() => false)) {
         entryFile = "src/app/page.tsx";
       }
       const fileCount = await countFilesRecursively(dirPath);
@@ -105,12 +105,12 @@ async function inspectDirectoryForProject(
     const hasVite =
       deps["vite"] ||
       devDeps["vite"] ||
-      (await fsp.access(path.join(dirPath, "vite.config.ts")).then(() => true).catch(() => false)) ||
-      (await fsp.access(path.join(dirPath, "vite.config.js")).then(() => true).catch(() => false));
+      (await fsp.access(path.join(/*turbopackIgnore: true*/ dirPath, "vite.config.ts")).then(() => true).catch(() => false)) ||
+      (await fsp.access(path.join(/*turbopackIgnore: true*/ dirPath, "vite.config.js")).then(() => true).catch(() => false));
 
     if (hasVite) {
       let entryFile = "src/App.tsx";
-      if (await fsp.access(path.join(dirPath, "src", "App.jsx")).then(() => true).catch(() => false)) {
+      if (await fsp.access(path.join(/*turbopackIgnore: true*/ dirPath, "src", "App.jsx")).then(() => true).catch(() => false)) {
         entryFile = "src/App.jsx";
       }
       const fileCount = await countFilesRecursively(dirPath);
@@ -127,15 +127,15 @@ async function inspectDirectoryForProject(
 
     // 3. Node.js API Service
     const hasNodeServer =
-      (await fsp.access(path.join(dirPath, "server.js")).then(() => true).catch(() => false)) ||
-      (await fsp.access(path.join(dirPath, "index.js")).then(() => true).catch(() => false)) ||
-      (await fsp.access(path.join(dirPath, "src", "index.ts")).then(() => true).catch(() => false));
+      (await fsp.access(path.join(/*turbopackIgnore: true*/ dirPath, "server.js")).then(() => true).catch(() => false)) ||
+      (await fsp.access(path.join(/*turbopackIgnore: true*/ dirPath, "index.js")).then(() => true).catch(() => false)) ||
+      (await fsp.access(path.join(/*turbopackIgnore: true*/ dirPath, "src", "index.ts")).then(() => true).catch(() => false));
 
     if (hasPkg && (hasNodeServer || deps["express"] || deps["fastify"] || deps["koa"])) {
       let entryFile = "server.js";
-      if (await fsp.access(path.join(dirPath, "src", "index.ts")).then(() => true).catch(() => false)) {
+      if (await fsp.access(path.join(/*turbopackIgnore: true*/ dirPath, "src", "index.ts")).then(() => true).catch(() => false)) {
         entryFile = "src/index.ts";
-      } else if (await fsp.access(path.join(dirPath, "index.js")).then(() => true).catch(() => false)) {
+      } else if (await fsp.access(path.join(/*turbopackIgnore: true*/ dirPath, "index.js")).then(() => true).catch(() => false)) {
         entryFile = "index.js";
       }
       const fileCount = await countFilesRecursively(dirPath);

@@ -1,8 +1,16 @@
-import * as pty from "node-pty";
+import type * as ptyTypes from "node-pty";
 import path from "path";
 import fs from "fs";
 import { getWorkspaceDir, resolveSafePath, syncDiskToDatabase } from "./workspaceDisk";
+import { getSanitizedWorkspaceEnv } from "./workspaceEnv";
 import { ShellType, TerminalTabInfo, AvailableShell, ProjectFile } from "@/types/editor";
+
+let ptyModule: typeof import("node-pty") | null = null;
+try {
+  ptyModule = require("node-pty");
+} catch (loadErr) {
+  console.warn("[Terminal] Native node-pty module is not available in current runtime:", loadErr);
+}
 
 export interface PtySession {
   id: string;
@@ -11,7 +19,7 @@ export interface PtySession {
   shellType: ShellType;
   shellPath: string;
   cwd: string;
-  ptyProcess: pty.IPty;
+  ptyProcess: ptyTypes.IPty;
   outputBuffer: string[]; // Circular replay buffer
   maxBufferSize: number;
   listeners: Set<(data: string) => void>;
@@ -54,7 +62,7 @@ export function getAvailableShells(): AvailableShell[] {
     ];
 
     for (const p of gitBashCandidates) {
-      if (fs.existsSync(p)) {
+      if (fs.existsSync(/*turbopackIgnore: true*/ p)) {
         list.push({
           type: "bash",
           label: "Git Bash",
@@ -150,24 +158,23 @@ export function createPtySession(
     shellArgs = ["-i"];
   }
 
+  if (!ptyModule) {
+    throw new Error(
+      "Persistent interactive terminal is not supported in the current serverless runtime. Please run within a containerized environment (Docker, Railway, Render, or Fly.io) with native PTY support."
+    );
+  }
+
   // Spawn real persistent PTY process
-  const ptyProcess = pty.spawn(shellInfo.path, shellArgs, {
+  const ptyProcess = ptyModule.spawn(shellInfo.path, shellArgs, {
     name: "xterm-256color",
     cols: Math.max(initialCols, 40),
     rows: Math.max(initialRows, 10),
     cwd: workspaceRoot,
-    env: {
-      ...process.env,
-      PROJECT_ID: projectId,
-      WORKSPACE_ROOT: workspaceRoot,
+    env: getSanitizedWorkspaceEnv(projectId, workspaceRoot, {
       PROJECT_DIR_NAME: shortProjName,
       PROMPT: `...\\${shortProjName}$G`,
       PS1: `.../${shortProjName}$ `,
-      NODE_ENV: "development",
-      TERM: "xterm-256color",
-      COLORTERM: "truecolor",
-      FORCE_COLOR: "1",
-    },
+    }),
     useConpty: false, // winpty provides rock-solid reliability across all Windows environments
   });
 
