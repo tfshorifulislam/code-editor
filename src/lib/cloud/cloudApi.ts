@@ -334,4 +334,243 @@ export const cloudApi = {
       return data.server;
     },
   },
+
+  terminal: {
+    async startSession(name?: string): Promise<{ projectId: string; name: string; cwd: string }> {
+      const res = await fetch("/api/projects/terminal-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to initialize terminal session");
+      return data;
+    },
+
+    async executeStream(
+      projectId: string,
+      command: string,
+      cwd: string,
+      onEvent: (event: { type: "stdout" | "stderr" | "exit" | "cwd" | "error"; data?: string; exitCode?: number; cwd?: string }) => void,
+      signal?: AbortSignal
+    ): Promise<void> {
+      const res = await fetch(`/api/projects/${projectId}/terminal/stream`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command, cwd }),
+        signal,
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Command execution failed with status ${res.status}`);
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) return;
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() || "";
+
+        for (const part of parts) {
+          const trimmed = part.trim();
+          if (trimmed.startsWith("data: ")) {
+            try {
+              const event = JSON.parse(trimmed.slice(6));
+              onEvent(event);
+            } catch (parseErr) {
+              console.warn("Failed to parse SSE event:", parseErr);
+            }
+          }
+        }
+      }
+
+      if (buffer.trim().startsWith("data: ")) {
+        try {
+          const event = JSON.parse(buffer.trim().slice(6));
+          onEvent(event);
+        } catch {}
+      }
+    },
+
+    async sendInput(projectId: string, input: string): Promise<boolean> {
+      const res = await fetch(`/api/projects/${projectId}/terminal/input`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input }),
+      });
+      const data = await res.json();
+      return Boolean(data.success);
+    },
+
+    async kill(projectId: string): Promise<boolean> {
+      const res = await fetch(`/api/projects/${projectId}/terminal/kill`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      return Boolean(data.success);
+    },
+
+    async detect(projectId: string): Promise<Array<{
+      path: string;
+      name: string;
+      template: ProjectTemplate;
+      frameworkLabel: string;
+      fileCount: number;
+      entryFile?: string;
+    }>> {
+      const res = await fetch(`/api/projects/${projectId}/detect`, { cache: "no-store" });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.detected || [];
+    },
+
+    async finalize(
+      projectId: string,
+      payload?: { name?: string; subfolder?: string }
+    ): Promise<{ success: boolean; projectId: string; template: string; redirectUrl: string }> {
+      const res = await fetch(`/api/projects/${projectId}/finalize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload || {}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to finalize project setup");
+      return data;
+    },
+
+    async cleanup(projectId: string): Promise<void> {
+      await fetch(`/api/projects/${projectId}/cleanup`, {
+        method: "POST",
+      }).catch(() => {});
+    },
+
+    async getSessions(projectId: string): Promise<{
+      sessions: import("@/types/editor").TerminalTabInfo[];
+      availableShells: import("@/types/editor").AvailableShell[];
+      wsPort: number;
+    }> {
+      const res = await fetch(`/api/projects/${projectId}/terminal/sessions`, { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed to load terminal sessions");
+      return res.json();
+    },
+
+    async createSession(
+      projectId: string,
+      shellType?: import("@/types/editor").ShellType,
+      name?: string
+    ): Promise<{ session: import("@/types/editor").TerminalTabInfo }> {
+      const res = await fetch(`/api/projects/${projectId}/terminal/sessions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shellType, name }),
+      });
+      if (!res.ok) throw new Error("Failed to create terminal session");
+      return res.json();
+    },
+
+    async renameSession(projectId: string, sessionId: string, name: string): Promise<void> {
+      const res = await fetch(`/api/projects/${projectId}/terminal/sessions`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, name }),
+      });
+      if (!res.ok) throw new Error("Failed to rename terminal session");
+    },
+
+    async closeSession(projectId: string, sessionId: string): Promise<void> {
+      const res = await fetch(`/api/projects/${projectId}/terminal/sessions?sessionId=${encodeURIComponent(sessionId)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to close terminal session");
+    },
+
+    async executeSessionStream(
+      projectId: string,
+      sessionId: string,
+      command: string,
+      onEvent: (event: {
+        type: "stdout" | "stderr" | "exit" | "cwd" | "error" | "sync";
+        data?: string;
+        exitCode?: number;
+        cwd?: string;
+        updatedFiles?: import("@/types/editor").ProjectFile[];
+      }) => void,
+      signal?: AbortSignal
+    ): Promise<void> {
+      const res = await fetch(`/api/projects/${projectId}/terminal/stream`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command, sessionId }),
+        signal,
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Command execution failed with status ${res.status}`);
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) return;
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() || "";
+
+        for (const part of parts) {
+          const trimmed = part.trim();
+          if (trimmed.startsWith("data: ")) {
+            try {
+              const event = JSON.parse(trimmed.slice(6));
+              onEvent(event);
+            } catch (parseErr) {
+              console.warn("Failed to parse SSE event:", parseErr);
+            }
+          }
+        }
+      }
+
+      if (buffer.trim().startsWith("data: ")) {
+        try {
+          const event = JSON.parse(buffer.trim().slice(6));
+          onEvent(event);
+        } catch {}
+      }
+    },
+
+    async sendSessionInput(projectId: string, sessionId: string, input: string): Promise<boolean> {
+      const res = await fetch(`/api/projects/${projectId}/terminal/input`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, input }),
+      });
+      const data = await res.json();
+      return Boolean(data.success);
+    },
+
+    async killSession(projectId: string, sessionId: string): Promise<boolean> {
+      const res = await fetch(`/api/projects/${projectId}/terminal/kill`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId }),
+      });
+      const data = await res.json();
+      return Boolean(data.success);
+    },
+  },
 };

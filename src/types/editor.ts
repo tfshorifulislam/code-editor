@@ -139,6 +139,22 @@ export type SidebarView =
 
 export type BottomTab = "terminal" | "output" | "problems" | "debug";
 
+export type ShellType = "powershell" | "cmd" | "bash" | "sh";
+
+export interface TerminalTabInfo {
+  id: string;
+  name: string;
+  shellType: ShellType;
+  cwd: string;
+  isRunning?: boolean;
+}
+
+export interface AvailableShell {
+  type: ShellType;
+  label: string;
+  path: string;
+}
+
 export interface GitFileStatus {
   fileId: string;
   path: string;

@@ -1,37 +1,75 @@
 "use client";
 
-import React, { useState, type ReactNode, type FormEvent } from "react";
+import React, { useState, useEffect, useRef, useCallback, FormEvent, KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   X,
-  Plus,
-  Sparkles,
-  FileCode,
-  Globe,
-  Layers,
-  Server,
-  FilePlus2,
-  Loader2,
+  Terminal,
+  Play,
+  Square,
+  Copy,
+  Trash2,
   Folder,
   ArrowRight,
-  ArrowLeft,
-  Lock,
-  GitBranch,
+  CheckCircle2,
   AlertCircle,
+  Loader2,
+  Sparkles,
+  CornerDownLeft,
 } from "lucide-react";
-import {
-  ProjectTemplate,
-  ProjectCreationType,
-  BlankSubtype,
-  NextJsConfig,
-} from "@/types/editor";
 import { cloudApi } from "@/lib/cloud/cloudApi";
+import { parseAnsiToSpans } from "@/lib/utils/ansi";
+import { ProjectTemplate } from "@/types/editor";
 
 interface NewProjectDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onCreated?: (projectId: string) => void;
 }
+
+interface LogEntry {
+  id: string;
+  type: "command" | "stdout" | "stderr" | "info" | "system";
+  text: string;
+  cwd?: string;
+}
+
+interface DetectedInfo {
+  path: string;
+  name: string;
+  template: ProjectTemplate;
+  frameworkLabel: string;
+  fileCount: number;
+  entryFile?: string;
+}
+
+const QUICK_COMMANDS = [
+  {
+    label: "Next.js App",
+    cmd: "npx create-next-app@latest . --ts --tailwind --eslint --app --use-npm --yes",
+    badge: "Full-Stack",
+  },
+  {
+    label: "React + Vite",
+    cmd: "npm create vite@latest . -- --template react-ts",
+    badge: "Frontend",
+  },
+  {
+    label: "Node.js API",
+    cmd: "npm init -y && npm install express dotenv",
+    badge: "Backend",
+  },
+  {
+    label: "Check Toolchain",
+    cmd: "node -v && npm -v && git --version",
+    badge: "System",
+  },
+  {
+    label: "Git Init",
+    cmd: "git init",
+    badge: "Git",
+  },
+];
 
 export default function NewProjectDialog({
   isOpen,
@@ -40,664 +78,630 @@ export default function NewProjectDialog({
 }: NewProjectDialogProps) {
   const router = useRouter();
 
-  // Wizard state: 1 = Details, 2 = Environment, 3 = Options (if applicable), 4 = Creating
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  // Session state
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [projectName, setProjectName] = useState<string>("cloud-app");
+  const [cwd, setCwd] = useState<string>("");
+  const [isInitializingSession, setIsInitializingSession] = useState(false);
 
-  // Step 1: Project Details
-  const [projectName, setProjectName] = useState("");
-  const [projectDescription, setProjectDescription] = useState("");
-  const [projectType, setProjectType] = useState<ProjectCreationType>("template");
-  const [isPrivate, setIsPrivate] = useState(true);
+  // Terminal state
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [inputVal, setInputVal] = useState("");
+  const [isRunning, setIsRunning] = useState(false);
+  const [history, setHistory] = useState<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState<number>(-1);
+  const [copied, setCopied] = useState(false);
 
-  // Step 2: Starting Environment
-  const [blankSubtype, setBlankSubtype] = useState<BlankSubtype>("empty");
-  const [initGit, setInitGit] = useState(true);
-  const [selectedTemplate, setSelectedTemplate] = useState<ProjectTemplate>("next-app");
+  // Project detection
+  const [detectedProjects, setDetectedProjects] = useState<DetectedInfo[]>([]);
+  const [isFinalizing, setIsFinalizing] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Step 3: Optional Technologies (Next.js)
-  const [nextConfig, setNextConfig] = useState<NextJsConfig>({
-    typescript: true,
-    tailwind: true,
-    shadcn: true,
-    eslint: true,
-    packageManager: "npm",
-  });
+  const terminalEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Creation & Progress state
-  const [progressStage, setProgressStage] = useState<string>("");
-  const [error, setError] = useState<string | null>(null);
+  // Auto-scroll terminal
+  const scrollToBottom = () => {
+    terminalEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    scrollToBottom();
+  }, [logs]);
 
-  const templates: {
-    id: ProjectTemplate;
-    title: string;
-    description: string;
-    icon: ReactNode;
-    tag: string;
-    hasOptions?: boolean;
-  }[] = [
-    {
-      id: "next-app",
-      title: "Next.js App Router",
-      description: "Modern fullstack framework with server components and metadata.",
-      icon: <Layers className="w-5 h-5 text-neutral-800" />,
-      tag: "Full-Stack",
-      hasOptions: true,
-    },
-    {
-      id: "react-ts",
-      title: "React + Vite + TS",
-      description: "Fast frontend application with React 19 and TypeScript tooling.",
-      icon: <FileCode className="w-5 h-5 text-cyan-500" />,
-      tag: "Frontend",
-    },
-    {
-      id: "node-api",
-      title: "Node.js & Express REST API",
-      description: "Backend HTTP server with JSON routes and middleware.",
-      icon: <Server className="w-5 h-5 text-emerald-500" />,
-      tag: "Backend",
-    },
-    {
-      id: "python",
-      title: "Python 3 Service",
-      description: "Data processing scripts, virtualenv, and service endpoints.",
-      icon: <FileCode className="w-5 h-5 text-blue-500" />,
-      tag: "Python",
-    },
-    {
-      id: "vanilla-web",
-      title: "HTML / CSS / JavaScript",
-      description: "Lightweight browser scratchpad with interactive DOM scripts.",
-      icon: <Globe className="w-5 h-5 text-amber-500" />,
-      tag: "Web",
-    },
-    {
-      id: "cpp",
-      title: "C++20 Systems App",
-      description: "Native C++20 algorithms with Makefile and compiler tooling.",
-      icon: <Layers className="w-5 h-5 text-indigo-500" />,
-      tag: "Native",
-    },
-    {
-      id: "go",
-      title: "Go Microservice",
-      description: "Concurrent HTTP server with go.mod dependency management.",
-      icon: <Globe className="w-5 h-5 text-sky-500" />,
-      tag: "Cloud",
-    },
-    {
-      id: "rust",
-      title: "Rust Systems Project",
-      description: "Memory-safe systems programming with Cargo manifest.",
-      icon: <Server className="w-5 h-5 text-orange-500" />,
-      tag: "Systems",
-    },
-  ];
+  // Check detection helper
+  const refreshDetection = useCallback(async (targetId: string) => {
+    try {
+      const detected = await cloudApi.terminal.detect(targetId);
+      setDetectedProjects(detected);
+    } catch (err) {
+      console.warn("Detection check failed:", err);
+    }
+  }, []);
 
-  const handleNextFromStep1 = (e: FormEvent) => {
-    e.preventDefault();
-    if (!projectName.trim()) {
-      setError("Please enter a valid project name.");
+  // Initialize session when dialog opens
+  useEffect(() => {
+    if (!isOpen) {
+      setProjectId(null);
+      setLogs([]);
+      setIsRunning(false);
+      setDetectedProjects([]);
       return;
     }
-    setError(null);
-    setStep(2);
-  };
 
-  const handleNextFromStep2 = () => {
-    setError(null);
-    // If template has configurable options (like Next.js), go to Step 3
-    if (projectType === "template" && selectedTemplate === "next-app") {
-      setStep(3);
-    } else {
-      executeCreation();
+    let isMounted = true;
+    setIsInitializingSession(true);
+    setErrorMsg(null);
+
+    const init = async () => {
+      try {
+        const session = await cloudApi.terminal.startSession(projectName || "cloud-app");
+        if (!isMounted) return;
+
+        setProjectId(session.projectId);
+        setCwd(session.cwd);
+        setLogs([
+          {
+            id: "sys-welcome",
+            type: "system",
+            text: "Antigravity Cloud Interactive Shell v2.4 (x86_64-pc)\n" +
+                  `Workspace root: ~/workspace (${session.projectId})\n` +
+                  "Run any command (e.g. npx create-next-app, npm create vite, npm init) to create your project.\n",
+          },
+        ]);
+        await refreshDetection(session.projectId);
+      } catch (err: unknown) {
+        if (!isMounted) return;
+        const msg = err instanceof Error ? err.message : "Failed to initialize terminal session";
+        setErrorMsg(msg);
+      } finally {
+        if (isMounted) setIsInitializingSession(false);
+      }
+    };
+
+    init();
+
+    return () => {
+      isMounted = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, [isOpen]);
+
+  // Execute or send input
+  const handleExecute = async (cmdToRun?: string) => {
+    const rawCmd = (cmdToRun !== undefined ? cmdToRun : inputVal).trim();
+    if (!projectId) return;
+
+    // If currently running, treat input as stdin
+    if (isRunning) {
+      if (rawCmd) {
+        setLogs((prev) => [
+          ...prev,
+          { id: `stdin-${Date.now()}`, type: "command", text: rawCmd, cwd },
+        ]);
+        setInputVal("");
+        await cloudApi.terminal.sendInput(projectId, rawCmd);
+      }
+      return;
+    }
+
+    if (!rawCmd) return;
+
+    // Built-in `clear` command
+    if (rawCmd === "clear" || rawCmd === "cls") {
+      setLogs([]);
+      setInputVal("");
+      return;
+    }
+
+    // Add to command history
+    setHistory((prev) => [rawCmd, ...prev]);
+    setHistoryIndex(-1);
+    setInputVal("");
+    setIsRunning(true);
+    setErrorMsg(null);
+
+    // Append command to log
+    setLogs((prev) => [
+      ...prev,
+      { id: `cmd-${Date.now()}`, type: "command", text: rawCmd, cwd },
+    ]);
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    try {
+      await cloudApi.terminal.executeStream(
+        projectId,
+        rawCmd,
+        cwd,
+        (event) => {
+          if (event.type === "stdout" && event.data) {
+            setLogs((prev) => [
+              ...prev,
+              { id: `stdout-${Date.now()}-${Math.random()}`, type: "stdout", text: event.data! },
+            ]);
+          } else if (event.type === "stderr" && event.data) {
+            setLogs((prev) => [
+              ...prev,
+              { id: `stderr-${Date.now()}-${Math.random()}`, type: "stderr", text: event.data! },
+            ]);
+          } else if (event.type === "cwd" && typeof event.cwd === "string") {
+            setCwd(event.cwd);
+          } else if (event.type === "exit") {
+            setIsRunning(false);
+            if (typeof event.cwd === "string") {
+              setCwd(event.cwd);
+            }
+            if (event.exitCode !== 0) {
+              setLogs((prev) => [
+                ...prev,
+                {
+                  id: `exit-${Date.now()}`,
+                  type: "info",
+                  text: `[Process exited with non-zero code ${event.exitCode}]\n`,
+                },
+              ]);
+            }
+            // Trigger project detection
+            refreshDetection(projectId);
+          } else if (event.type === "error") {
+            setIsRunning(false);
+            setLogs((prev) => [
+              ...prev,
+              { id: `err-${Date.now()}`, type: "stderr", text: event.data || "Unknown process error\n" },
+            ]);
+          }
+        },
+        controller.signal
+      );
+    } catch (err: unknown) {
+      if ((err as Error)?.name !== "AbortError") {
+        const msg = err instanceof Error ? err.message : String(err);
+        setLogs((prev) => [
+          ...prev,
+          { id: `catch-${Date.now()}`, type: "stderr", text: `Error: ${msg}\n` },
+        ]);
+      }
+    } finally {
+      setIsRunning(false);
+      abortControllerRef.current = null;
+      refreshDetection(projectId);
+      inputRef.current?.focus();
     }
   };
 
-  const executeCreation = async () => {
-    setError(null);
-    setStep(4);
+  // Keyboard navigation for command history
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (history.length > 0) {
+        const nextIdx = Math.min(historyIndex + 1, history.length - 1);
+        setHistoryIndex(nextIdx);
+        setInputVal(history[nextIdx]);
+      }
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (historyIndex > 0) {
+        const nextIdx = historyIndex - 1;
+        setHistoryIndex(nextIdx);
+        setInputVal(history[nextIdx]);
+      } else if (historyIndex === 0) {
+        setHistoryIndex(-1);
+        setInputVal("");
+      }
+    } else if (e.key === "c" && e.ctrlKey) {
+      // Ctrl+C kill
+      if (isRunning && projectId) {
+        e.preventDefault();
+        handleStopProcess();
+      }
+    }
+  };
+
+  const handleStopProcess = async () => {
+    if (!projectId) return;
+    try {
+      await cloudApi.terminal.kill(projectId);
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      setLogs((prev) => [
+        ...prev,
+        { id: `kill-${Date.now()}`, type: "info", text: "^C [Process terminated by user]\n" },
+      ]);
+      setIsRunning(false);
+      refreshDetection(projectId);
+    } catch (err) {
+      console.warn("Failed to kill process:", err);
+    }
+  };
+
+  const handleCopyLogs = () => {
+    const text = logs.map((l) => l.text).join("");
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleClearLogs = () => {
+    setLogs([]);
+  };
+
+  // Finalize and Open in Editor
+  const handleOpenProjectInEditor = async () => {
+    if (!projectId) return;
+    setIsFinalizing(true);
+    setErrorMsg(null);
 
     try {
-      // Stage 1
-      setProgressStage("Creating Cloud Workspace...");
-      await new Promise((r) => setTimeout(r, 400));
+      const topProject = detectedProjects[0];
+      const subfolder = topProject && topProject.path ? topProject.path : undefined;
 
-      // Stage 2
-      setProgressStage(
-        projectType === "blank"
-          ? blankSubtype === "empty"
-            ? "Initializing Empty Workspace..."
-            : "Generating Basic Web Files..."
-          : `Configuring ${selectedTemplate} Toolchain...`
-      );
-      await new Promise((r) => setTimeout(r, 400));
-
-      if (projectType === "template" && selectedTemplate === "next-app" && nextConfig.shadcn) {
-        setProgressStage("Configuring shadcn/ui and Tailwind components...");
-        await new Promise((r) => setTimeout(r, 400));
-      }
-
-      // Execute cloud project creation
-      const created = await cloudApi.projects.create({
-        name: projectName.trim(),
-        description: projectDescription.trim() || undefined,
-        type: projectType,
-        template: projectType === "template" ? selectedTemplate : undefined,
-        blankSubtype: projectType === "blank" ? blankSubtype : undefined,
-        initGit,
-        isPrivate,
-        nextConfig: selectedTemplate === "next-app" ? nextConfig : undefined,
+      const result = await cloudApi.terminal.finalize(projectId, {
+        name: projectName.trim() || topProject?.name || "cloud-app",
+        subfolder,
       });
-
-      setProgressStage("Ready — Opening Cloud IDE...");
-      await new Promise((r) => setTimeout(r, 300));
 
       onClose();
       if (onCreated) {
-        onCreated(created.id);
+        onCreated(result.projectId);
       } else {
-        router.push(`/editor/${created.id}`);
+        router.push(result.redirectUrl || `/editor/${result.projectId}`);
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to create project.";
-      setError(msg);
-      setStep(2);
+      const msg = err instanceof Error ? err.message : "Failed to finalize project setup";
+      setErrorMsg(msg);
+      setIsFinalizing(false);
     }
   };
 
+  // Safe Cancel and Cleanup
+  const handleCancel = async () => {
+    if (projectId) {
+      // Stop running process and cleanup workspace if empty
+      if (isRunning) {
+        await cloudApi.terminal.kill(projectId).catch(() => {});
+      }
+      if (detectedProjects.length === 0 || detectedProjects[0]?.fileCount === 0) {
+        await cloudApi.terminal.cleanup(projectId).catch(() => {});
+      }
+    }
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  const topDetected = detectedProjects[0];
+  const hasFiles = Boolean(topDetected && topDetected.fileCount > 0);
+
   return (
     <div
-      onClick={onClose}
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150 font-sans"
+      onClick={handleCancel}
+      className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-150 font-sans"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-xl bg-white border border-[#eaeaea] rounded-3xl shadow-2xl p-6 sm:p-7 space-y-6 text-[#171717] select-none"
+        className="w-full max-w-4xl bg-[#0f1117] border border-neutral-800 rounded-2xl shadow-2xl flex flex-col text-neutral-200 overflow-hidden max-h-[92vh]"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-[#f0f0f0]">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-[var(--color-primary)] flex items-center justify-center text-white shadow-xs">
-              <Plus className="w-4 h-4 stroke-[2.5]" />
+        {/* Header Bar */}
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-neutral-800 bg-[#161822]">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[var(--color-primary)]/20 border border-[var(--color-primary)]/40 flex items-center justify-center text-[var(--color-primary)] shadow-xs">
+              <Terminal className="w-4 h-4 stroke-[2.5]" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-[#171717]">New Cloud Project</h3>
-              <p className="text-xs text-neutral-500">
-                {step === 1 && "Step 1 of 3 — Project Details"}
-                {step === 2 && "Step 2 of 3 — Starting Environment"}
-                {step === 3 && "Step 3 of 3 — Optional Technologies"}
-                {step === 4 && "Provisioning Cloud Workspace..."}
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-white tracking-tight">New Project Terminal</h3>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-300 border border-neutral-700">
+                  Interactive Cloud Shell
+                </span>
+              </div>
+              <p className="text-[11px] text-neutral-400 mt-0.5">
+                Run official CLIs (Next.js, Vite, Express, Python) to initialize your workspace on real disk.
               </p>
             </div>
           </div>
-          {step !== 4 && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1.5 text-neutral-400 hover:text-neutral-700 rounded-lg hover:bg-neutral-100 transition cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
+
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800/80 transition cursor-pointer"
+            title="Close (Esc)"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
-        {/* Step 1: Project Details */}
-        {step === 1 && (
-          <form onSubmit={handleNextFromStep1} className="space-y-5">
-            {/* Project Name */}
-            <div>
-              <label className="text-xs font-semibold text-neutral-700 block mb-1.5">
-                Project Name <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="text"
-                autoFocus
-                required
-                value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
-                placeholder="e.g. cloud-analytics-dashboard"
-                className="w-full bg-[#f9f9fb] border border-[#e5e5e7] focus:border-[var(--color-primary)] focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-[#171717] outline-none transition"
-              />
-            </div>
+        {/* Project Name & Path Bar */}
+        <div className="px-5 py-2.5 bg-[#12141d] border-b border-neutral-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+          {/* Project Name Input */}
+          <div className="flex items-center gap-2">
+            <span className="text-neutral-400 font-medium">Project Name:</span>
+            <input
+              type="text"
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+              placeholder="e.g. my-awesome-app"
+              disabled={isInitializingSession || isRunning}
+              className="bg-[#1a1d28] border border-neutral-700/80 focus:border-[var(--color-primary)] focus:bg-[#1f2332] rounded-md px-2.5 py-1 text-xs text-white font-medium outline-none transition w-44 sm:w-56"
+            />
+          </div>
 
-            {/* Project Type: Blank vs Template */}
-            <div>
-              <label className="text-xs font-semibold text-neutral-700 block mb-2">
-                Project Setup Type
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Blank Project Card */}
-                <div
-                  onClick={() => setProjectType("blank")}
-                  className={`p-4 rounded-2xl border cursor-pointer transition flex flex-col justify-between space-y-2 ${
-                    projectType === "blank"
-                      ? "border-[var(--color-primary)] bg-[var(--color-accent-soft)]/50 ring-1 ring-[var(--color-primary)] shadow-xs"
-                      : "border-[#eaeaea] hover:border-neutral-300 bg-white"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="w-8 h-8 rounded-lg bg-neutral-100 flex items-center justify-center text-neutral-700">
-                      <Folder className="w-4 h-4" />
-                    </div>
-                    {projectType === "blank" && (
-                      <span className="text-[10px] text-[var(--color-primary)] font-bold">
-                        Selected ✓
-                      </span>
-                    )}
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-[#171717]">Blank Project</h4>
-                    <p className="text-[11px] text-neutral-500 mt-0.5 leading-relaxed">
-                      Start with an empty workspace. Add languages, frameworks, or tools later.
-                    </p>
-                  </div>
-                </div>
+          {/* Working Directory Indicator */}
+          <div className="flex items-center gap-1.5 font-mono text-[11px] text-neutral-400 bg-neutral-900/80 px-2.5 py-1 rounded border border-neutral-800">
+            <Folder className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-neutral-500">cwd:</span>
+            <span className="text-emerald-400 font-semibold">
+              ~/workspace{cwd ? `/${cwd}` : ""}
+            </span>
+          </div>
 
-                {/* Template Project Card */}
-                <div
-                  onClick={() => setProjectType("template")}
-                  className={`p-4 rounded-2xl border cursor-pointer transition flex flex-col justify-between space-y-2 ${
-                    projectType === "template"
-                      ? "border-[var(--color-primary)] bg-[var(--color-accent-soft)]/50 ring-1 ring-[var(--color-primary)] shadow-xs"
-                      : "border-[#eaeaea] hover:border-neutral-300 bg-white"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center text-[var(--color-primary)]">
-                      <Sparkles className="w-4 h-4" />
-                    </div>
-                    {projectType === "template" && (
-                      <span className="text-[10px] text-[var(--color-primary)] font-bold">
-                        Selected ✓
-                      </span>
-                    )}
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-[#171717]">Template Project</h4>
-                    <p className="text-[11px] text-neutral-500 mt-0.5 leading-relaxed">
-                      Start with a clean, working template for Next.js, React, Node, Python, etc.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Optional Description */}
-            <div>
-              <label className="text-xs font-semibold text-neutral-700 block mb-1.5">
-                Description <span className="text-neutral-400 font-normal">(Optional)</span>
-              </label>
-              <input
-                type="text"
-                value={projectDescription}
-                onChange={(e) => setProjectDescription(e.target.value)}
-                placeholder="Brief summary of your project..."
-                className="w-full bg-[#f9f9fb] border border-[#e5e5e7] focus:border-[var(--color-primary)] focus:bg-white rounded-xl px-3.5 py-2 text-xs text-[#171717] outline-none transition"
-              />
-            </div>
-
-            {/* Visibility Toggle */}
-            <div className="p-3 bg-[#fbfbfd] border border-[#eaeaea] rounded-xl flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2">
-                <Lock className="w-4 h-4 text-neutral-500" />
-                <div>
-                  <span className="font-semibold text-neutral-800">Private Cloud Project</span>
-                  <p className="text-[11px] text-neutral-400">Only accessible by your authenticated account</p>
-                </div>
-              </div>
-              <input
-                type="checkbox"
-                checked={isPrivate}
-                onChange={(e) => setIsPrivate(e.target.checked)}
-                className="accent-[var(--color-primary)] w-4 h-4 cursor-pointer"
-              />
-            </div>
-
-            {error && (
-              <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 p-2.5 rounded-lg flex items-center gap-1.5">
-                <AlertCircle className="w-3.5 h-3.5" />
-                <span>{error}</span>
-              </p>
-            )}
-
-            {/* Footer */}
-            <div className="pt-3 border-t border-[#f0f0f0] flex items-center justify-end gap-2.5">
+          {/* Terminal Action Buttons */}
+          <div className="flex items-center gap-1.5">
+            {isRunning && (
               <button
                 type="button"
-                onClick={onClose}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-neutral-600 hover:bg-neutral-100 transition cursor-pointer"
+                onClick={handleStopProcess}
+                className="px-2.5 py-1 rounded bg-rose-950/80 hover:bg-rose-900 border border-rose-800/80 text-rose-300 font-medium text-[11px] flex items-center gap-1 transition cursor-pointer"
+                title="Stop running command (Ctrl+C)"
               >
-                Cancel
+                <Square className="w-3 h-3 fill-rose-400" />
+                <span>Stop</span>
               </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleCopyLogs}
+              className="px-2 py-1 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[11px] flex items-center gap-1 transition cursor-pointer"
+              title="Copy terminal output"
+            >
+              <Copy className="w-3 h-3" />
+              <span>{copied ? "Copied!" : "Copy"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleClearLogs}
+              className="px-2 py-1 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[11px] flex items-center gap-1 transition cursor-pointer"
+              title="Clear terminal"
+            >
+              <Trash2 className="w-3 h-3" />
+              <span>Clear</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Quick Starters Bar */}
+        <div className="px-5 py-2 bg-[#141620] border-b border-neutral-800/60 flex items-center gap-2 overflow-x-auto no-scrollbar">
+          <span className="text-[11px] font-semibold text-neutral-400 flex items-center gap-1 shrink-0">
+            <Sparkles className="w-3 h-3 text-[var(--color-primary)]" />
+            <span>Quick Starters:</span>
+          </span>
+
+          <div className="flex items-center gap-1.5 flex-nowrap">
+            {QUICK_COMMANDS.map((qc) => (
               <button
-                type="submit"
-                className="px-5 py-2 rounded-xl bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white text-xs font-bold shadow-xs hover:shadow transition cursor-pointer flex items-center gap-1.5"
+                key={qc.label}
+                type="button"
+                disabled={isRunning || isInitializingSession}
+                onClick={() => {
+                  setInputVal(qc.cmd);
+                  inputRef.current?.focus();
+                }}
+                className="px-2.5 py-1 rounded-full text-[11px] font-mono border border-neutral-700 hover:border-neutral-500 bg-[#1e2230] hover:bg-[#252b3d] text-neutral-200 transition shrink-0 cursor-pointer flex items-center gap-1.5"
+                title={`Paste command: ${qc.cmd}`}
               >
-                <span>Continue</span>
-                <ArrowRight className="w-3.5 h-3.5" />
+                <span className="font-sans font-semibold text-white">{qc.label}</span>
+                <span className="text-[9px] px-1 py-0.2 rounded bg-neutral-800 text-neutral-400">
+                  {qc.badge}
+                </span>
               </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Terminal Window Content */}
+        <div className="flex-1 min-h-[300px] max-h-[460px] p-4 bg-[#0a0c10] font-mono text-[12px] leading-relaxed overflow-y-auto selection:bg-purple-900 selection:text-white select-text">
+          {isInitializingSession && (
+            <div className="py-6 flex items-center justify-center gap-2 text-neutral-400 text-xs">
+              <Loader2 className="w-4 h-4 animate-spin text-[var(--color-primary)]" />
+              <span>Provisioning isolated physical workspace...</span>
             </div>
-          </form>
-        )}
+          )}
 
-        {/* Step 2: Choose Starting Environment */}
-        {step === 2 && (
-          <div className="space-y-4">
-            {projectType === "blank" ? (
-              <div className="space-y-3">
-                <p className="text-xs text-neutral-500">
-                  Select your blank workspace configuration:
-                </p>
-
-                {/* Empty Workspace Option */}
-                <div
-                  onClick={() => setBlankSubtype("empty")}
-                  className={`p-3.5 rounded-2xl border cursor-pointer transition flex items-start gap-3 ${
-                    blankSubtype === "empty"
-                      ? "border-[var(--color-primary)] bg-[var(--color-accent-soft)]/50 ring-1 ring-[var(--color-primary)]"
-                      : "border-[#eaeaea] hover:bg-neutral-50"
-                  }`}
-                >
-                  <div className="p-2 rounded-xl bg-white border border-[#eaeaea] shadow-2xs">
-                    <FilePlus2 className="w-4 h-4 text-purple-600" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-neutral-900">
-                        Completely Empty Workspace (0 files)
-                      </span>
-                      {blankSubtype === "empty" && (
-                        <span className="text-[10px] text-[var(--color-primary)] font-bold">
-                          Selected ✓
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-neutral-500 mt-0.5 leading-relaxed">
-                      Genuinely empty folder. No demo files, no fake application code, no unsolicited dependencies.
-                    </p>
-                  </div>
+          {logs.map((log) => {
+            if (log.type === "command") {
+              return (
+                <div key={log.id} className="text-neutral-300 py-0.5 flex items-start gap-2">
+                  <span className="text-emerald-400 font-bold select-none">
+                    ~/workspace{log.cwd ? `/${log.cwd}` : ""} $
+                  </span>
+                  <span className="text-white font-semibold">{log.text}</span>
                 </div>
+              );
+            }
 
-                {/* Basic Web Files Option */}
-                <div
-                  onClick={() => setBlankSubtype("basic-web")}
-                  className={`p-3.5 rounded-2xl border cursor-pointer transition flex items-start gap-3 ${
-                    blankSubtype === "basic-web"
-                      ? "border-[var(--color-primary)] bg-[var(--color-accent-soft)]/50 ring-1 ring-[var(--color-primary)]"
-                      : "border-[#eaeaea] hover:bg-neutral-50"
-                  }`}
-                >
-                  <div className="p-2 rounded-xl bg-white border border-[#eaeaea] shadow-2xs">
-                    <Globe className="w-4 h-4 text-amber-500" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-neutral-900">
-                        Basic Web Files (index.html & styles.css)
-                      </span>
-                      {blankSubtype === "basic-web" && (
-                        <span className="text-[10px] text-[var(--color-primary)] font-bold">
-                          Selected ✓
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-neutral-500 mt-0.5 leading-relaxed">
-                      Minimal standard HTML5 entrypoint and stylesheet for quick frontend scripting.
-                    </p>
-                  </div>
+            if (log.type === "system") {
+              return (
+                <div key={log.id} className="text-neutral-500 py-1 whitespace-pre-wrap">
+                  {log.text}
                 </div>
+              );
+            }
 
-                {/* Git Repository Checkbox */}
-                <div className="pt-2">
-                  <label className="flex items-center gap-2 p-3 bg-[#fbfbfd] border border-[#eaeaea] rounded-xl cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={initGit}
-                      onChange={(e) => setInitGit(e.target.checked)}
-                      className="accent-[var(--color-primary)] w-4 h-4"
-                    />
-                    <GitBranch className="w-4 h-4 text-emerald-500" />
-                    <span className="text-xs font-medium text-neutral-700">
-                      Initialize Git repository configuration (.gitignore)
+            if (log.type === "info") {
+              return (
+                <div key={log.id} className="text-amber-400 py-0.5 whitespace-pre-wrap font-medium">
+                  {log.text}
+                </div>
+              );
+            }
+
+            if (log.type === "stderr") {
+              const spans = parseAnsiToSpans(log.text);
+              return (
+                <div key={log.id} className="text-rose-400 whitespace-pre-wrap">
+                  {spans.map((s, idx) => (
+                    <span
+                      key={idx}
+                      style={{ color: s.color }}
+                      className={`${s.bold ? "font-bold" : ""} ${s.dim ? "opacity-75" : ""}`}
+                    >
+                      {s.text}
                     </span>
-                  </label>
+                  ))}
+                </div>
+              );
+            }
+
+            // stdout
+            const spans = parseAnsiToSpans(log.text);
+            return (
+              <span key={log.id} className="text-neutral-200 whitespace-pre-wrap">
+                {spans.map((s, idx) => (
+                  <span
+                    key={idx}
+                    style={{ color: s.color }}
+                    className={`${s.bold ? "font-bold" : ""} ${s.dim ? "opacity-75" : ""}`}
+                  >
+                    {s.text}
+                  </span>
+                ))}
+              </span>
+            );
+          })}
+
+          {/* Running Indicator */}
+          {isRunning && (
+            <div className="flex items-center gap-2 text-purple-400 text-[11px] py-1 select-none animate-pulse">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              <span>Executing command in cloud sandbox...</span>
+            </div>
+          )}
+
+          <div ref={terminalEndRef} />
+        </div>
+
+        {/* Command Input Bar */}
+        <form
+          onSubmit={(e: FormEvent) => {
+            e.preventDefault();
+            handleExecute();
+          }}
+          className="p-3 bg-[#12141c] border-t border-neutral-800 flex items-center gap-2"
+        >
+          <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-emerald-400 shrink-0 select-none">
+            <span>~/workspace{cwd ? `/${cwd}` : ""} $</span>
+          </div>
+
+          <input
+            ref={inputRef}
+            type="text"
+            autoFocus
+            disabled={isInitializingSession}
+            value={inputVal}
+            onChange={(e) => setInputVal(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={
+              isRunning
+                ? "Send input to running command (stdin)..."
+                : "Type command (e.g. npx create-next-app@latest . --yes) or click a quick starter..."
+            }
+            className="flex-1 bg-transparent border-0 text-white font-mono text-xs outline-none placeholder:text-neutral-600 focus:ring-0"
+          />
+
+          <button
+            type="submit"
+            disabled={isInitializingSession}
+            className="px-3 py-1.5 rounded-lg bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] disabled:opacity-50 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1 shrink-0 shadow-xs"
+          >
+            {isRunning ? (
+              <>
+                <CornerDownLeft className="w-3.5 h-3.5" />
+                <span>Send</span>
+              </>
+            ) : (
+              <>
+                <Play className="w-3 h-3 fill-white" />
+                <span>Run</span>
+              </>
+            )}
+          </button>
+        </form>
+
+        {/* Bottom Status & Open in Editor Bar */}
+        <div className="px-5 py-3 bg-[#161824] border-t border-neutral-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+          {/* Project Detection Badge */}
+          <div className="flex items-center gap-2">
+            {hasFiles ? (
+              <div className="flex items-center gap-2 p-1.5 px-3 rounded-lg bg-emerald-950/60 border border-emerald-800/80 text-emerald-300">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <div>
+                  <span className="font-bold text-emerald-300">
+                    {topDetected.frameworkLabel || "Project Detected"}
+                  </span>
+                  <span className="text-emerald-400/80 text-[11px] ml-1.5">
+                    ({topDetected.fileCount} {topDetected.fileCount === 1 ? "file" : "files"} ready
+                    {topDetected.path ? ` in ./${topDetected.path}` : ""})
+                  </span>
                 </div>
               </div>
             ) : (
-              <div className="space-y-2">
-                <p className="text-xs text-neutral-500">
-                  Select a verified starter template:
-                </p>
-                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                  {templates.map((tpl) => {
-                    const isSelected = selectedTemplate === tpl.id;
-                    return (
-                      <div
-                        key={tpl.id}
-                        onClick={() => setSelectedTemplate(tpl.id)}
-                        className={`flex items-start gap-3 p-3 rounded-2xl border cursor-pointer transition ${
-                          isSelected
-                            ? "border-[var(--color-primary)] bg-[var(--color-accent-soft)]/50 ring-1 ring-[var(--color-primary)]"
-                            : "border-[#eaeaea] hover:border-neutral-300 hover:bg-neutral-50/80 bg-white"
-                        }`}
-                      >
-                        <div className="p-2 rounded-xl bg-white border border-[#eaeaea] shadow-2xs shrink-0">
-                          {tpl.icon}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-[#171717]">
-                              {tpl.title}
-                            </span>
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[10px] font-semibold px-2 py-0.2 rounded-full bg-neutral-100 text-neutral-600">
-                                {tpl.tag}
-                              </span>
-                              {isSelected && (
-                                <span className="text-[10px] text-[var(--color-primary)] font-bold">
-                                  ✓
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <p className="text-[11px] text-neutral-500 mt-0.5 leading-relaxed">
-                            {tpl.description}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {error && (
-              <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 p-2.5 rounded-lg flex items-center gap-1.5">
-                <AlertCircle className="w-3.5 h-3.5" />
-                <span>{error}</span>
-              </p>
-            )}
-
-            {/* Footer */}
-            <div className="pt-3 border-t border-[#f0f0f0] flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-neutral-600 hover:bg-neutral-100 transition cursor-pointer flex items-center gap-1.5"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Back</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleNextFromStep2}
-                className="px-5 py-2 rounded-xl bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white text-xs font-bold shadow-xs hover:shadow transition cursor-pointer flex items-center gap-1.5"
-              >
+              <div className="flex items-center gap-2 text-neutral-400 text-[11px]">
+                <AlertCircle className="w-4 h-4 text-neutral-500 shrink-0" />
                 <span>
-                  {projectType === "template" && selectedTemplate === "next-app"
-                    ? "Configure Tooling"
-                    : "Create Project"}
+                  No project files detected yet. Run a scaffold command or click a starter above.
                 </span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 3: Optional Technologies (Next.js) */}
-        {step === 3 && (
-          <div className="space-y-4">
-            <div>
-              <h4 className="text-xs font-bold text-[#171717]">
-                Configure Next.js Technologies
-              </h4>
-              <p className="text-xs text-neutral-500 mt-0.5">
-                Choose only the official dependencies and tooling for this project:
-              </p>
-            </div>
-
-            <div className="space-y-2.5 bg-[#fbfbfd] border border-[#eaeaea] rounded-2xl p-4">
-              {/* TypeScript */}
-              <label className="flex items-center justify-between p-2 rounded-xl hover:bg-white cursor-pointer transition">
-                <div>
-                  <span className="text-xs font-bold text-neutral-900">TypeScript</span>
-                  <p className="text-[11px] text-neutral-500">Includes tsconfig.json and strict type checking</p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={nextConfig.typescript}
-                  onChange={(e) => setNextConfig({ ...nextConfig, typescript: e.target.checked })}
-                  className="accent-[var(--color-primary)] w-4 h-4 cursor-pointer"
-                />
-              </label>
-
-              {/* Tailwind CSS */}
-              <label className="flex items-center justify-between p-2 rounded-xl hover:bg-white cursor-pointer transition">
-                <div>
-                  <span className="text-xs font-bold text-neutral-900">Tailwind CSS</span>
-                  <p className="text-[11px] text-neutral-500">Configures tailwind.config.ts and utility classes</p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={nextConfig.tailwind}
-                  onChange={(e) => setNextConfig({ ...nextConfig, tailwind: e.target.checked })}
-                  className="accent-[var(--color-primary)] w-4 h-4 cursor-pointer"
-                />
-              </label>
-
-              {/* shadcn/ui */}
-              <label className="flex items-center justify-between p-2 rounded-xl hover:bg-white cursor-pointer transition">
-                <div>
-                  <span className="text-xs font-bold text-neutral-900 flex items-center gap-1.5">
-                    <span>shadcn/ui</span>
-                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-100 text-purple-700">
-                      Recommended
-                    </span>
-                  </span>
-                  <p className="text-[11px] text-neutral-500">
-                    Generates components.json, @/lib/utils, and Button & Card components
-                  </p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={nextConfig.shadcn}
-                  onChange={(e) => setNextConfig({ ...nextConfig, shadcn: e.target.checked })}
-                  className="accent-[var(--color-primary)] w-4 h-4 cursor-pointer"
-                />
-              </label>
-
-              {/* ESLint */}
-              <label className="flex items-center justify-between p-2 rounded-xl hover:bg-white cursor-pointer transition">
-                <div>
-                  <span className="text-xs font-bold text-neutral-900">ESLint</span>
-                  <p className="text-[11px] text-neutral-500">Next.js recommended linting rules</p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={nextConfig.eslint}
-                  onChange={(e) => setNextConfig({ ...nextConfig, eslint: e.target.checked })}
-                  className="accent-[var(--color-primary)] w-4 h-4 cursor-pointer"
-                />
-              </label>
-            </div>
-
-            {/* Package Manager Selection */}
-            <div className="flex items-center justify-between p-3 border border-[#eaeaea] rounded-xl text-xs">
-              <span className="font-semibold text-neutral-700">Package Manager</span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setNextConfig({ ...nextConfig, packageManager: "npm" })}
-                  className={`px-3 py-1 rounded-lg font-mono font-semibold transition cursor-pointer ${
-                    nextConfig.packageManager === "npm"
-                      ? "bg-[var(--color-primary)] text-white shadow-xs"
-                      : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
-                  }`}
-                >
-                  npm
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setNextConfig({ ...nextConfig, packageManager: "pnpm" })}
-                  className={`px-3 py-1 rounded-lg font-mono font-semibold transition cursor-pointer ${
-                    nextConfig.packageManager === "pnpm"
-                      ? "bg-[var(--color-primary)] text-white shadow-xs"
-                      : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
-                  }`}
-                >
-                  pnpm
-                </button>
               </div>
-            </div>
-
-            {error && (
-              <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 p-2.5 rounded-lg flex items-center gap-1.5">
-                <AlertCircle className="w-3.5 h-3.5" />
-                <span>{error}</span>
-              </p>
             )}
-
-            {/* Footer */}
-            <div className="pt-3 border-t border-[#f0f0f0] flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setStep(2)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-neutral-600 hover:bg-neutral-100 transition cursor-pointer flex items-center gap-1.5"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Back</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={executeCreation}
-                className="px-5 py-2 rounded-xl bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white text-xs font-bold shadow-xs hover:shadow transition cursor-pointer flex items-center gap-1.5"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Create Project</span>
-              </button>
-            </div>
           </div>
-        )}
 
-        {/* Step 4: Provisioning Progress State */}
-        {step === 4 && (
-          <div className="py-8 flex flex-col items-center justify-center text-center space-y-4">
-            <div className="w-14 h-14 rounded-2xl bg-[var(--color-accent-soft)] flex items-center justify-center text-[var(--color-primary)]">
-              <Loader2 className="w-7 h-7 animate-spin" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-neutral-900">{progressStage}</h4>
-              <p className="text-xs text-neutral-500 mt-1">
-                Setting up your isolated cloud development workspace...
-              </p>
-            </div>
+          {errorMsg && (
+            <p className="text-rose-400 text-xs flex items-center gap-1">
+              <AlertCircle className="w-3.5 h-3.5" />
+              <span>{errorMsg}</span>
+            </p>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleCancel}
+              className="px-4 py-2 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-800 transition cursor-pointer font-medium text-xs"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="button"
+              disabled={!hasFiles || isFinalizing || isRunning}
+              onClick={handleOpenProjectInEditor}
+              className={`px-5 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 shadow-md ${
+                hasFiles && !isFinalizing && !isRunning
+                  ? "bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white ring-2 ring-[var(--color-primary)]/40 shadow-purple-900/40"
+                  : "bg-neutral-800 text-neutral-500 cursor-not-allowed border border-neutral-700/60"
+              }`}
+            >
+              {isFinalizing ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Syncing Workspace & Launching...</span>
+                </>
+              ) : (
+                <>
+                  <span>Open Project in Editor</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </>
+              )}
+            </button>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

@@ -32,6 +32,7 @@ interface FileExplorerProps {
   onRenameFile: (fileId: string, newName: string) => void;
   onDeleteFile: (fileId: string) => void;
   onResetProject: () => void;
+  onRefresh?: () => void;
   onOpenInitializeProject?: () => void;
   onUploadFiles?: (files: FileList | File[], targetParentId: string | null) => Promise<void> | void;
 }
@@ -44,6 +45,7 @@ export default function FileExplorer({
   onRenameFile,
   onDeleteFile,
   onResetProject,
+  onRefresh,
   onOpenInitializeProject,
   onUploadFiles,
 }: FileExplorerProps) {
@@ -449,8 +451,8 @@ export default function FileExplorer({
           )}
           <button
             type="button"
-            onClick={onResetProject}
-            title="Reset Project Files"
+            onClick={onRefresh || onResetProject}
+            title="Refresh File Explorer"
             className="p-1 hover:text-white rounded hover:bg-[#333333] transition cursor-pointer"
           >
             <RefreshCw className="w-3 h-3" />

@@ -559,6 +559,21 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
     });
   }, []);
 
+  const handleRefreshWorkspaceFiles = useCallback(async () => {
+    if (!activeProject?.id) return;
+    try {
+      const res = await fetch(`/api/projects/${activeProject.id}/sync`, { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.files && Array.isArray(data.files)) {
+          handleFilesSynced(data.files);
+        }
+      }
+    } catch (err) {
+      console.warn("Manual workspace refresh failed:", err);
+    }
+  }, [activeProject?.id, handleFilesSynced]);
+
   const handleRunPreview = useCallback(() => {
     if (activeFile && unsavedFiles[activeFile.id]) {
       handleSaveActiveFile();
@@ -856,6 +871,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
                 onCreateFile={handleCreateFile}
                 onRenameFile={handleRenameFile}
                 onDeleteFile={handleDeleteFile}
+                onRefresh={handleRefreshWorkspaceFiles}
                 onResetProject={() => setIsInitializeDialogOpen(true)}
                 onOpenInitializeProject={() => setIsInitializeDialogOpen(true)}
                 onUploadFiles={handleUploadFiles}
