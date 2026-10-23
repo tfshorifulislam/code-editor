@@ -1,14 +1,14 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { parse as parseUrl } from "url";
 import {
-  getTerminalSession,
-  executeCommandInSession,
-  writeSessionStdin,
-  killSessionProcess,
-  createTerminalSession,
-  listTerminalSessions,
-  StreamEvent,
-} from "./terminalSessionManager";
+  getPtySession,
+  createPtySession,
+  listPtySessions,
+  writePtySession,
+  resizePtySession,
+  sendPtySignal,
+  PtySession,
+} from "./terminalPtyManager";
 
 let wssInstance: WebSocketServer | null = null;
 let currentBoundPort: number = 3005;
@@ -21,7 +21,7 @@ export function getTerminalWSPort(): number {
 }
 
 /**
- * Initializes or returns the singleton WebSocket server for interactive terminal sessions.
+ * Initializes or returns the singleton WebSocket server for interactive PTY terminal sessions.
  */
 export function getOrCreateTerminalWSServer(): WebSocketServer {
   if (wssInstance) {
@@ -47,72 +47,80 @@ export function getOrCreateTerminalWSServer(): WebSocketServer {
           return;
         }
 
-        // Retrieve or create session
-        let session = sessionId ? getTerminalSession(projectId, sessionId) : undefined;
+        // Retrieve or create persistent PTY session
+        let session: PtySession | undefined = sessionId
+          ? getPtySession(projectId, sessionId)
+          : undefined;
+
         if (!session) {
-          const sessions = listTerminalSessions(projectId);
+          const sessions = listPtySessions(projectId);
           session = sessions.length > 0
-            ? getTerminalSession(projectId, sessions[0].id)
-            : createTerminalSession(projectId);
+            ? getPtySession(projectId, sessions[0].id)
+            : createPtySession(projectId);
         }
 
         if (!session) {
-          session = createTerminalSession(projectId);
+          session = createPtySession(projectId);
         }
 
         sessionId = session.id;
 
-        // Send initialization state & buffer replay to client
+        // 1. Send session metadata and replayed buffer
         ws.send(
           JSON.stringify({
             type: "init",
             sessionId: session.id,
             name: session.name,
             shellType: session.shellType,
-            cwd: session.cwd,
-            history: session.history,
-            recentBuffer: session.recentBuffer.join(""),
+            buffer: session.outputBuffer.join(""),
           })
         );
 
-        let activeKillFn: (() => Promise<boolean>) | null = null;
+        // 2. Attach real-time PTY output broadcaster
+        const onPtyData = (chunk: string) => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "output", data: chunk }));
+          }
+        };
 
-        // Handle incoming messages from the xterm frontend
+        const onSyncData = (updatedFiles: unknown) => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "sync", updatedFiles }));
+          }
+        };
+
+        session.listeners.add(onPtyData);
+        session.syncListeners.add(onSyncData);
+
+        // 3. Handle incoming client events (raw typing, resize, signals)
         ws.on("message", (raw) => {
           try {
             const msg = JSON.parse(raw.toString("utf-8"));
 
-            if (msg.type === "execute" && typeof msg.command === "string") {
-              activeKillFn = executeCommandInSession(
-                projectId,
-                sessionId,
-                msg.command,
-                (ev: StreamEvent) => {
-                  if (ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify(ev));
-                  }
-                }
-              );
-            } else if (msg.type === "input" && typeof msg.data === "string") {
-              writeSessionStdin(projectId, sessionId, msg.data);
-            } else if (msg.type === "kill") {
-              killSessionProcess(projectId, sessionId).then(() => {
-                if (ws.readyState === WebSocket.OPEN) {
-                  ws.send(JSON.stringify({ type: "stderr", data: "^C\r\n" }));
-                }
-              });
+            if (msg.type === "input" && typeof msg.data === "string") {
+              writePtySession(projectId, sessionId, msg.data);
+            } else if (msg.type === "resize") {
+              const cols = typeof msg.cols === "number" ? msg.cols : 80;
+              const rows = typeof msg.rows === "number" ? msg.rows : 24;
+              resizePtySession(projectId, sessionId, cols, rows);
+            } else if (msg.type === "kill" || msg.type === "signal") {
+              sendPtySignal(projectId, sessionId, "SIGINT");
             }
           } catch (err) {
             console.warn("WebSocket parse error:", err);
           }
         });
 
+        // 4. Detach listeners on disconnect (shell stays alive!)
         ws.on("close", () => {
-          // Client disconnected
+          session?.listeners.delete(onPtyData);
+          session?.syncListeners.delete(onSyncData);
         });
 
         ws.on("error", (err) => {
           console.warn("WebSocket client error:", err);
+          session?.listeners.delete(onPtyData);
+          session?.syncListeners.delete(onSyncData);
         });
       });
 

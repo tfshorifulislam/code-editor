@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { getProjectById } from "@/lib/server/projectService";
 import {
-  listTerminalSessions,
-  createTerminalSession,
-  renameTerminalSession,
-  closeTerminalSession,
+  listPtySessions,
+  createPtySession,
+  renamePtySession,
+  closePtySession,
   getAvailableShells,
-} from "@/lib/server/terminalSessionManager";
+} from "@/lib/server/terminalPtyManager";
 import { getOrCreateTerminalWSServer, getTerminalWSPort } from "@/lib/server/terminalWebSocketServer";
 import { ShellType } from "@/types/editor";
 
@@ -34,7 +34,7 @@ export async function GET(req: Request, { params }: RouteProps) {
     console.warn("WebSocket server start error:", err);
   }
 
-  const sessions = listTerminalSessions(projectId);
+  const sessions = listPtySessions(projectId);
   const availableShells = getAvailableShells();
   const wsPort = getTerminalWSPort();
 
@@ -61,7 +61,7 @@ export async function POST(req: Request, { params }: RouteProps) {
   const shellType = body.shellType as ShellType | undefined;
   const name = typeof body.name === "string" ? body.name : undefined;
 
-  const session = createTerminalSession(projectId, shellType, name);
+  const session = createPtySession(projectId, shellType, name);
 
   return NextResponse.json({
     session: {
@@ -93,7 +93,7 @@ export async function PATCH(req: Request, { params }: RouteProps) {
     return NextResponse.json({ error: "Missing sessionId or name" }, { status: 400 });
   }
 
-  const renamed = renameTerminalSession(projectId, sessionId, newName);
+  const renamed = renamePtySession(projectId, sessionId, newName);
 
   return NextResponse.json({ success: renamed });
 }
@@ -117,8 +117,7 @@ export async function DELETE(req: Request, { params }: RouteProps) {
     return NextResponse.json({ error: "Missing sessionId" }, { status: 400 });
   }
 
-  const closed = await closeTerminalSession(projectId, sessionId);
+  const closed = closePtySession(projectId, sessionId);
 
   return NextResponse.json({ success: closed });
 }
-

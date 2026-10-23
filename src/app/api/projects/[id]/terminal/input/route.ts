@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { getProjectById } from "@/lib/server/projectService";
 import { writeStdin, isProcessRunning } from "@/lib/server/terminalProcessManager";
-import { writeSessionStdin } from "@/lib/server/terminalSessionManager";
+import { writePtySession } from "@/lib/server/terminalPtyManager";
 
 interface RouteProps {
   params: Promise<{ id: string }>;
@@ -25,7 +25,7 @@ export async function POST(req: Request, { params }: RouteProps) {
   const sessionId = body.sessionId as string | undefined;
 
   if (sessionId) {
-    const sent = writeSessionStdin(projectId, sessionId, input);
+    const sent = writePtySession(projectId, sessionId, input);
     return NextResponse.json({ success: sent });
   }
 
@@ -42,4 +42,3 @@ export async function POST(req: Request, { params }: RouteProps) {
     success: sent,
   });
 }
-

@@ -34,14 +34,13 @@ interface TerminalPanelProps {
   onFilesSynced?: (files: ProjectFile[]) => void;
 }
 
-interface SessionTerminalInstance {
+interface ActiveSessionHandle {
   term: XTerm;
   fitAddon: FitAddon;
-  inputBuffer: string;
-  history: string[];
-  historyIndex: number;
-  isRunning: boolean;
-  cwd: string;
+  containerEl: HTMLDivElement;
+  ws?: WebSocket;
+  isWsConnected: boolean;
+  httpAbortController?: AbortController;
 }
 
 export default function TerminalPanel({
@@ -65,27 +64,24 @@ export default function TerminalPanel({
   const [sessions, setSessions] = useState<TerminalTabInfo[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string>("");
   const [availableShells, setAvailableShells] = useState<AvailableShell[]>([]);
+  const [wsPort, setWsPort] = useState<number>(3005);
   const [isShellMenuOpen, setIsShellMenuOpen] = useState(false);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
 
-  // Map of active xterm instances per session ID
-  const instancesRef = useRef<Map<string, SessionTerminalInstance>>(new Map());
-  const containerRef = useRef<HTMLDivElement>(null);
-  const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
+  // Map of active xterm sessions: sessionId -> ActiveSessionHandle
+  const sessionsMapRef = useRef<Map<string, ActiveSessionHandle>>(new Map());
+  const masterContainerRef = useRef<HTMLDivElement>(null);
 
-  // Helper to format prompt
-  const getPrompt = useCallback((cwd: string) => {
-    const cleanCwd = (cwd || "").replace(/\\/g, "/").replace(/^\/+/, "");
-    return cleanCwd ? `\x1b[32m~/project/${cleanCwd}\x1b[0m \x1b[35m$\x1b[0m ` : `\x1b[32m~/project\x1b[0m \x1b[35m$\x1b[0m `;
-  }, []);
-
-  // Fetch or initialize sessions
-  const loadSessions = useCallback(async () => {
+  // Load available sessions and shells from backend
+  const loadSessionsData = useCallback(async () => {
     try {
       const data = await cloudApi.terminal.getSessions(project.id);
       setSessions(data.sessions);
       setAvailableShells(data.availableShells);
+      if (typeof data.wsPort === "number") {
+        setWsPort(data.wsPort);
+      }
 
       if (data.sessions.length > 0) {
         setActiveSessionId((prev) => {
@@ -100,111 +96,171 @@ export default function TerminalPanel({
 
   useEffect(() => {
     if (isOpen) {
-      loadSessions();
+      loadSessionsData();
     }
-  }, [isOpen, loadSessions]);
+  }, [isOpen, loadSessionsData]);
 
-  // Execute command in a session
-  const executeCommand = useCallback(
-    async (sessionId: string, cmdToRun: string) => {
-      const instance = instancesRef.current.get(sessionId);
-      if (!instance) return;
+  // Connect a session's xterm directly to the persistent PTY backend
+  const setupSessionConnection = useCallback(
+    (sessionId: string, handle: ActiveSessionHandle) => {
+      const { term, fitAddon } = handle;
 
-      const trimmed = cmdToRun.trim();
-      if (!trimmed) {
-        instance.term.write(`\r\n${getPrompt(instance.cwd)}`);
-        return;
-      }
+      // 1. Establish authenticated WebSocket connection to persistent PTY
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const hostname = window.location.hostname || "localhost";
+      const wsUrl = `${protocol}//${hostname}:${wsPort}?projectId=${encodeURIComponent(project.id)}&sessionId=${encodeURIComponent(sessionId)}`;
 
-      // Record in command history
-      if (instance.history.length === 0 || instance.history[instance.history.length - 1] !== trimmed) {
-        instance.history.push(trimmed);
-      }
-      instance.historyIndex = -1;
-
-      // Check client-side clear
-      if (trimmed === "clear" || trimmed === "cls") {
-        instance.term.clear();
-        instance.term.write(getPrompt(instance.cwd));
-        return;
-      }
-
-      instance.isRunning = true;
-      setSessions((prev) =>
-        prev.map((s) => (s.id === sessionId ? { ...s, isRunning: true } : s))
-      );
-
-      const controller = new AbortController();
-      abortControllersRef.current.set(sessionId, controller);
-
+      let socket: WebSocket | null = null;
       try {
-        await cloudApi.terminal.executeSessionStream(
-          project.id,
-          sessionId,
-          trimmed,
-          (event) => {
-            if (event.type === "stdout" && event.data) {
-              instance.term.write(event.data);
-            } else if (event.type === "stderr" && event.data) {
-              instance.term.write(event.data);
-            } else if (event.type === "cwd" && typeof event.cwd === "string") {
-              instance.cwd = event.cwd;
-              setSessions((prev) =>
-                prev.map((s) => (s.id === sessionId ? { ...s, cwd: event.cwd! } : s))
-              );
-            } else if (event.type === "sync" && event.updatedFiles && onFilesSynced) {
-              onFilesSynced(event.updatedFiles);
-            } else if (event.type === "exit") {
-              instance.isRunning = false;
-              if (typeof event.cwd === "string") {
-                instance.cwd = event.cwd;
-              }
-              if (event.updatedFiles && onFilesSynced) {
-                onFilesSynced(event.updatedFiles);
-              }
-              setSessions((prev) =>
-                prev.map((s) => (s.id === sessionId ? { ...s, isRunning: false, cwd: instance.cwd } : s))
-              );
-              instance.term.write(`\r\n${getPrompt(instance.cwd)}`);
-            } else if (event.type === "error") {
-              instance.isRunning = false;
-              setSessions((prev) =>
-                prev.map((s) => (s.id === sessionId ? { ...s, isRunning: false } : s))
-              );
-              instance.term.write(`\r\n\x1b[31m${event.data || "Unknown process error"}\x1b[0m\r\n${getPrompt(instance.cwd)}`);
-            }
-          },
-          controller.signal
-        );
-      } catch (err: unknown) {
-        if ((err as Error)?.name !== "AbortError") {
-          const msg = err instanceof Error ? err.message : String(err);
-          instance.term.write(`\r\n\x1b[31mExecution failed: ${msg}\x1b[0m\r\n${getPrompt(instance.cwd)}`);
-        }
-      } finally {
-        instance.isRunning = false;
-        abortControllersRef.current.delete(sessionId);
-        setSessions((prev) =>
-          prev.map((s) => (s.id === sessionId ? { ...s, isRunning: false } : s))
-        );
+        socket = new WebSocket(wsUrl);
+      } catch (err) {
+        console.warn("WebSocket creation error, falling back to HTTP stream:", err);
       }
+
+      // Fallback helper for HTTP stream
+      const startHttpStreamingFallback = () => {
+        handle.isWsConnected = false;
+        const controller = new AbortController();
+        handle.httpAbortController = controller;
+
+        fetch(`/api/projects/${project.id}/terminal/stream`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId }),
+          signal: controller.signal,
+        })
+          .then(async (res) => {
+            if (!res.ok || !res.body) return;
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split("\n\n");
+              buffer = lines.pop() || "";
+
+              for (const line of lines) {
+                const trimmed = line.trim();
+                if (trimmed.startsWith("data: ")) {
+                  try {
+                    const event = JSON.parse(trimmed.slice(6));
+                    if (event.type === "output" && typeof event.data === "string") {
+                      term.write(event.data);
+                    } else if (event.type === "sync" && event.updatedFiles && onFilesSynced) {
+                      onFilesSynced(event.updatedFiles);
+                    }
+                  } catch {}
+                }
+              }
+            }
+          })
+          .catch(() => {});
+      };
+
+      if (socket) {
+        handle.ws = socket;
+
+        socket.onopen = () => {
+          handle.isWsConnected = true;
+          // Synchronize initial dimensions
+          try {
+            fitAddon.fit();
+            socket?.send(
+              JSON.stringify({
+                type: "resize",
+                cols: term.cols,
+                rows: term.rows,
+              })
+            );
+          } catch {}
+        };
+
+        socket.onmessage = (event) => {
+          try {
+            const msg = JSON.parse(event.data);
+            if (msg.type === "init") {
+              if (msg.buffer) {
+                term.write(msg.buffer);
+              }
+            } else if (msg.type === "output" && typeof msg.data === "string") {
+              term.write(msg.data);
+            } else if (msg.type === "sync" && msg.updatedFiles && onFilesSynced) {
+              onFilesSynced(msg.updatedFiles);
+            }
+          } catch (err) {
+            console.warn("WebSocket parse error:", err);
+          }
+        };
+
+        socket.onerror = () => {
+          console.warn("WebSocket connection failed, switching to HTTP stream...");
+          startHttpStreamingFallback();
+        };
+
+        socket.onclose = () => {
+          if (handle.isWsConnected) {
+            handle.isWsConnected = false;
+          }
+        };
+      } else {
+        startHttpStreamingFallback();
+      }
+
+      // 2. Route raw xterm keystrokes directly to the PTY
+      term.onData((data) => {
+        if (handle.ws && handle.ws.readyState === WebSocket.OPEN) {
+          handle.ws.send(JSON.stringify({ type: "input", data }));
+        } else {
+          // HTTP Fallback
+          fetch(`/api/projects/${project.id}/terminal/input`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId, input: data }),
+          }).catch(() => {});
+        }
+      });
+
+      // 3. Route xterm resize events directly to the PTY
+      term.onResize(({ cols, rows }) => {
+        if (handle.ws && handle.ws.readyState === WebSocket.OPEN) {
+          handle.ws.send(JSON.stringify({ type: "resize", cols, rows }));
+        } else {
+          // HTTP Fallback
+          fetch(`/api/projects/${project.id}/terminal/resize`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId, cols, rows }),
+          }).catch(() => {});
+        }
+      });
     },
-    [project.id, getPrompt, onFilesSynced]
+    [project.id, wsPort, onFilesSynced]
   );
 
-  // Initialize or attach xterm for active session
+  // Initialize or reveal active xterm instance
   useEffect(() => {
-    if (!isOpen || activeTab !== "terminal" || !activeSessionId || !containerRef.current) {
+    if (!isOpen || activeTab !== "terminal" || !activeSessionId || !masterContainerRef.current) {
       return;
     }
 
     const sessionInfo = sessions.find((s) => s.id === activeSessionId);
     if (!sessionInfo) return;
 
-    let instance = instancesRef.current.get(activeSessionId);
+    let handle = sessionsMapRef.current.get(activeSessionId);
 
-    if (!instance) {
-      // Create new xterm instance
+    if (!handle) {
+      // 1. Create container element
+      const containerEl = document.createElement("div");
+      containerEl.className = "w-full h-full";
+      containerEl.style.height = "100%";
+      containerEl.style.width = "100%";
+      masterContainerRef.current.appendChild(containerEl);
+
+      // 2. Create xterm.js instance with genuine VS Code typography
       const term = new XTerm({
         cursorBlink: true,
         cursorStyle: "block",
@@ -242,112 +298,44 @@ export default function TerminalPanel({
       term.loadAddon(fitAddon);
       term.loadAddon(new WebLinksAddon());
 
-      instance = {
+      term.open(containerEl);
+
+      handle = {
         term,
         fitAddon,
-        inputBuffer: "",
-        history: [],
-        historyIndex: -1,
-        isRunning: false,
-        cwd: sessionInfo.cwd || "",
+        containerEl,
+        isWsConnected: false,
       };
 
-      instancesRef.current.set(activeSessionId, instance);
+      sessionsMapRef.current.set(activeSessionId, handle);
 
-      // Render welcome banner and prompt
-      term.write(`\x1b[38;2;130;80;223m[Antigravity Cloud IDE]\x1b[0m Integrated Terminal (${sessionInfo.shellType})\r\n`);
-      term.write(`\x1b[90mWorkspace Root: ~/project | Shell: ${sessionInfo.name}\x1b[0m\r\n\r\n`);
-      term.write(getPrompt(instance.cwd));
-
-      // Handle keyboard and user data input
-      term.onData((data) => {
-        const inst = instancesRef.current.get(activeSessionId);
-        if (!inst) return;
-
-        // If foreground process is running, pipe raw stdin directly
-        if (inst.isRunning) {
-          if (data === "\x03") {
-            // Ctrl+C
-            cloudApi.terminal.killSession(project.id, activeSessionId);
-            inst.term.write("^C\r\n");
-            return;
-          }
-          cloudApi.terminal.sendSessionInput(project.id, activeSessionId, data);
-          return;
-        }
-
-        // Standard shell line editing
-        if (data === "\r") {
-          // Enter key
-          const cmd = inst.inputBuffer;
-          inst.inputBuffer = "";
-          inst.historyIndex = -1;
-          inst.term.write("\r\n");
-          executeCommand(activeSessionId, cmd);
-        } else if (data === "\x7f" || data === "\b") {
-          // Backspace
-          if (inst.inputBuffer.length > 0) {
-            inst.inputBuffer = inst.inputBuffer.slice(0, -1);
-            inst.term.write("\b \b");
-          }
-        } else if (data === "\x03") {
-          // Ctrl+C when idle
-          inst.inputBuffer = "";
-          inst.term.write("^C\r\n" + getPrompt(inst.cwd));
-        } else if (data === "\x0c") {
-          // Ctrl+L (clear screen)
-          inst.term.clear();
-          inst.term.write(getPrompt(inst.cwd) + inst.inputBuffer);
-        } else if (data === "\x1b[A") {
-          // Up Arrow - navigate history
-          if (inst.history.length > 0) {
-            const nextIdx = inst.historyIndex < inst.history.length - 1 ? inst.historyIndex + 1 : inst.historyIndex;
-            inst.historyIndex = nextIdx;
-            const pastCmd = inst.history[inst.history.length - 1 - nextIdx] || "";
-            // Clear current line
-            inst.term.write(`\r\x1b[2K${getPrompt(inst.cwd)}${pastCmd}`);
-            inst.inputBuffer = pastCmd;
-          }
-        } else if (data === "\x1b[B") {
-          // Down Arrow - navigate history
-          if (inst.historyIndex > 0) {
-            const nextIdx = inst.historyIndex - 1;
-            inst.historyIndex = nextIdx;
-            const pastCmd = inst.history[inst.history.length - 1 - nextIdx] || "";
-            inst.term.write(`\r\x1b[2K${getPrompt(inst.cwd)}${pastCmd}`);
-            inst.inputBuffer = pastCmd;
-          } else if (inst.historyIndex === 0) {
-            inst.historyIndex = -1;
-            inst.term.write(`\r\x1b[2K${getPrompt(inst.cwd)}`);
-            inst.inputBuffer = "";
-          }
-        } else if (data >= " " || data === "\t") {
-          // Printable characters or tab
-          inst.inputBuffer += data;
-          inst.term.write(data);
-        }
-      });
+      // 3. Connect to backend PTY
+      setupSessionConnection(activeSessionId, handle);
     }
 
-    // Attach to DOM container
-    containerRef.current.innerHTML = "";
-    instance.term.open(containerRef.current);
+    // Hide inactive session containers and show the active one
+    sessionsMapRef.current.forEach((h, sId) => {
+      if (sId === activeSessionId) {
+        h.containerEl.style.display = "block";
+        setTimeout(() => {
+          try {
+            h.fitAddon.fit();
+            h.term.focus();
+          } catch {}
+        }, 50);
+      } else {
+        h.containerEl.style.display = "none";
+      }
+    });
+  }, [isOpen, activeTab, activeSessionId, sessions, setupSessionConnection]);
 
-    setTimeout(() => {
-      try {
-        instance?.fitAddon.fit();
-        instance?.term.focus();
-      } catch {}
-    }, 50);
-  }, [isOpen, activeTab, activeSessionId, sessions, project.id, getPrompt, executeCommand]);
-
-  // Window or panel resize handler
+  // Handle Window Resize
   useEffect(() => {
     const handleResize = () => {
-      if (activeSessionId) {
-        const inst = instancesRef.current.get(activeSessionId);
+      const activeHandle = sessionsMapRef.current.get(activeSessionId);
+      if (activeHandle) {
         try {
-          inst?.fitAddon.fit();
+          activeHandle.fitAddon.fit();
         } catch {}
       }
     };
@@ -356,7 +344,7 @@ export default function TerminalPanel({
     return () => window.removeEventListener("resize", handleResize);
   }, [activeSessionId]);
 
-  // Handle Drag Resizing
+  // Handle Drag Resizing of Terminal Panel Height
   const handleMouseDownResize = (e: MouseEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -369,10 +357,10 @@ export default function TerminalPanel({
       const newHeight = Math.min(Math.max(startHeightRef.current + deltaY, 140), maxHeight);
       setPanelHeight(newHeight);
 
-      if (activeSessionId) {
-        const inst = instancesRef.current.get(activeSessionId);
+      const activeHandle = sessionsMapRef.current.get(activeSessionId);
+      if (activeHandle) {
         try {
-          inst?.fitAddon.fit();
+          activeHandle.fitAddon.fit();
         } catch {}
       }
     };
@@ -387,27 +375,29 @@ export default function TerminalPanel({
     window.addEventListener("mouseup", handleMouseUp);
   };
 
-  // Create new session
+  // Create New Session Tab
   const handleCreateSession = async (shellType?: ShellType) => {
     setIsShellMenuOpen(false);
     try {
       const res = await cloudApi.terminal.createSession(project.id, shellType);
-      await loadSessions();
+      await loadSessionsData();
       setActiveSessionId(res.session.id);
     } catch (err) {
       console.warn("Failed to create session:", err);
     }
   };
 
-  // Close session tab
+  // Close Session Tab
   const handleCloseSession = async (e: MouseEvent, sessionId: string) => {
     e.stopPropagation();
     try {
-      // Clean up instance
-      const inst = instancesRef.current.get(sessionId);
-      if (inst) {
-        inst.term.dispose();
-        instancesRef.current.delete(sessionId);
+      const handle = sessionsMapRef.current.get(sessionId);
+      if (handle) {
+        if (handle.ws) handle.ws.close();
+        if (handle.httpAbortController) handle.httpAbortController.abort();
+        handle.term.dispose();
+        handle.containerEl.remove();
+        sessionsMapRef.current.delete(sessionId);
       }
 
       await cloudApi.terminal.closeSession(project.id, sessionId);
@@ -422,7 +412,7 @@ export default function TerminalPanel({
     }
   };
 
-  // Rename session tab
+  // Rename Session Tab
   const handleRenameSessionSubmit = async (sessionId: string) => {
     if (!editingName.trim()) {
       setEditingSessionId(null);
@@ -440,32 +430,45 @@ export default function TerminalPanel({
     }
   };
 
-  // Kill running process in active session
-  const handleKillActive = async () => {
+  // Kill Running Process / Send Ctrl+C
+  const handleKillActive = () => {
     if (!activeSessionId) return;
-    try {
-      await cloudApi.terminal.killSession(project.id, activeSessionId);
-      const inst = instancesRef.current.get(activeSessionId);
-      if (inst) {
-        inst.isRunning = false;
-        inst.term.write("^C\r\n" + getPrompt(inst.cwd));
-      }
-      setSessions((prev) =>
-        prev.map((s) => (s.id === activeSessionId ? { ...s, isRunning: false } : s))
-      );
-    } catch (err) {
-      console.warn("Failed to kill session process:", err);
+    const handle = sessionsMapRef.current.get(activeSessionId);
+    if (handle?.ws && handle.ws.readyState === WebSocket.OPEN) {
+      handle.ws.send(JSON.stringify({ type: "kill" }));
+    } else {
+      cloudApi.terminal.killSession(project.id, activeSessionId);
     }
   };
 
-  // Clear active terminal
+  // Clear Terminal
   const handleClearActive = () => {
     if (!activeSessionId) return;
-    const inst = instancesRef.current.get(activeSessionId);
-    if (inst) {
-      inst.term.clear();
-      inst.term.write(getPrompt(inst.cwd));
+    const handle = sessionsMapRef.current.get(activeSessionId);
+    if (handle) {
+      handle.term.clear();
+      // Send Ctrl+L to shell
+      if (handle.ws && handle.ws.readyState === WebSocket.OPEN) {
+        handle.ws.send(JSON.stringify({ type: "input", data: "\x0c" }));
+      }
     }
+  };
+
+  // Right-Click Paste Support
+  const handleContextMenu = async (e: MouseEvent) => {
+    e.preventDefault();
+    if (!activeSessionId) return;
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        const handle = sessionsMapRef.current.get(activeSessionId);
+        if (handle?.ws && handle.ws.readyState === WebSocket.OPEN) {
+          handle.ws.send(JSON.stringify({ type: "input", data: text }));
+        } else {
+          cloudApi.terminal.sendSessionInput(project.id, activeSessionId, text);
+        }
+      }
+    } catch {}
   };
 
   if (!isOpen) return null;
@@ -504,7 +507,7 @@ export default function TerminalPanel({
             <TerminalIcon className="w-3.5 h-3.5" />
             <span>Terminal</span>
             {activeSession?.isRunning && (
-              <Loader2 className="w-3 h-3 animate-spin text-amber-400 ml-0.5" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
             )}
           </button>
 
@@ -560,11 +563,7 @@ export default function TerminalPanel({
                   }`}
                   title="Click to switch, double click to rename"
                 >
-                  {sess.isRunning ? (
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                  ) : (
-                    <span className="w-1.5 h-1.5 rounded-full bg-neutral-500" />
-                  )}
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
 
                   {editingSessionId === sess.id ? (
                     <input
@@ -604,25 +603,21 @@ export default function TerminalPanel({
           {activeTab === "terminal" && (
             <>
               {/* Working Directory Indicator */}
-              {activeSession && (
-                <div className="hidden lg:flex items-center gap-1 font-mono text-[11px] text-neutral-400 bg-black/40 px-2 py-0.5 rounded mr-1 border border-neutral-800">
-                  <Folder className="w-3 h-3 text-amber-400" />
-                  <span className="text-emerald-400">~/project{activeSession.cwd ? `/${activeSession.cwd}` : ""}</span>
-                </div>
-              )}
+              <div className="hidden lg:flex items-center gap-1 font-mono text-[11px] text-neutral-400 bg-black/40 px-2 py-0.5 rounded mr-1 border border-neutral-800">
+                <Folder className="w-3 h-3 text-amber-400" />
+                <span className="text-emerald-400">~/project</span>
+              </div>
 
               {/* Stop Running Process (Ctrl+C) */}
-              {activeSession?.isRunning && (
-                <button
-                  type="button"
-                  onClick={handleKillActive}
-                  title="Kill foreground process (Ctrl+C)"
-                  className="px-2 py-0.5 rounded bg-rose-950/80 hover:bg-rose-900 border border-rose-800/80 text-rose-300 font-medium text-[11px] flex items-center gap-1 transition cursor-pointer"
-                >
-                  <Square className="w-2.5 h-2.5 fill-rose-400" />
-                  <span>Kill</span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={handleKillActive}
+                title="Interrupt foreground process (Ctrl+C)"
+                className="px-2 py-0.5 rounded bg-neutral-800 hover:bg-rose-950/80 hover:text-rose-300 border border-neutral-700 text-neutral-300 font-medium text-[11px] flex items-center gap-1 transition cursor-pointer"
+              >
+                <Square className="w-2.5 h-2.5 fill-current" />
+                <span>Ctrl+C</span>
+              </button>
 
               {/* New Terminal Dropdown */}
               <div className="relative">
@@ -712,18 +707,18 @@ export default function TerminalPanel({
 
       {/* Main Panel Content Body */}
       <div className="flex-1 overflow-hidden relative bg-[#181818]">
-        {/* Terminal Tab: Genuine xterm.js Canvas / DOM */}
-        {activeTab === "terminal" && (
-          <div
-            ref={containerRef}
-            className="w-full h-full p-2 overflow-hidden cursor-text"
-            onClick={() => {
-              if (activeSessionId) {
-                instancesRef.current.get(activeSessionId)?.term.focus();
-              }
-            }}
-          />
-        )}
+        {/* Terminal Tab: Persistent PTY-driven xterm Canvas */}
+        <div
+          ref={masterContainerRef}
+          onContextMenu={handleContextMenu}
+          style={{ display: activeTab === "terminal" ? "block" : "none" }}
+          className="w-full h-full p-2 overflow-hidden cursor-text select-text"
+          onClick={() => {
+            if (activeSessionId) {
+              sessionsMapRef.current.get(activeSessionId)?.term.focus();
+            }
+          }}
+        />
 
         {/* Output / Console Tab Content */}
         {activeTab === "output" && (

@@ -594,7 +594,13 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
   // Global Keyboard Shortcuts
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Allow terminal to receive its own keys without editor shortcut interception
+      const isInsideTerminal = Boolean((e.target as HTMLElement)?.closest(".xterm"));
       const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+
+      if (isInsideTerminal && !(isCmdOrCtrl && e.key === "`")) {
+        return;
+      }
 
       if (isCmdOrCtrl && e.key.toLowerCase() === "s") {
         e.preventDefault();

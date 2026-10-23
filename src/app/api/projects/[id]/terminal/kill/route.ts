@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { getProjectById } from "@/lib/server/projectService";
 import { killSessionProcess, isProcessRunning } from "@/lib/server/terminalProcessManager";
-import { killSessionProcess as killMultiSessionProcess } from "@/lib/server/terminalSessionManager";
+import { sendPtySignal } from "@/lib/server/terminalPtyManager";
 
 interface RouteProps {
   params: Promise<{ id: string }>;
@@ -24,7 +24,7 @@ export async function POST(req: Request, { params }: RouteProps) {
   const sessionId = body.sessionId as string | undefined;
 
   if (sessionId) {
-    const killed = await killMultiSessionProcess(projectId, sessionId);
+    const killed = sendPtySignal(projectId, sessionId, "SIGINT");
     return NextResponse.json({ success: true, killed });
   }
 
@@ -37,4 +37,3 @@ export async function POST(req: Request, { params }: RouteProps) {
     killed,
   });
 }
-

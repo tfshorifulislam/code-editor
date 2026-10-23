@@ -165,6 +165,15 @@ export async function syncDiskToDatabase(projectId: string): Promise<ProjectFile
     return [];
   }
 
+  // Ensure project exists in database before reconciling
+  const projectExists = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { id: true },
+  });
+  if (!projectExists) {
+    return [];
+  }
+
   // 1. Fetch current DB files
   const dbFiles = await prisma.projectFile.findMany({
     where: { projectId },
