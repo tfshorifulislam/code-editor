@@ -6,6 +6,11 @@ import type { OnMount } from "@monaco-editor/react";
 import type * as Monaco from "monaco-editor";
 import { ProjectFile, EditorSettings, Project } from "@/types/editor";
 import { configureMonacoTypeScript } from "@/lib/monaco/typescriptService";
+import {
+  registerHtmlJsxTagCompletion,
+  setupAutoCloseTagOnTyping,
+  setupEmmetTabExpansion,
+} from "@/lib/monaco/tagCompletionService";
 import ImagePreviewer, { isImageFile } from "./ImagePreviewer";
 
 // Dynamically import Editor to completely eliminate SSR issues
@@ -40,6 +45,8 @@ export default function MonacoEditorComponent({
 }: MonacoEditorProps) {
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<typeof Monaco | null>(null);
+  const autoCloseDisposableRef = useRef<Monaco.IDisposable | null>(null);
+  const emmetTabDisposableRef = useRef<Monaco.IDisposable | null>(null);
 
   const handleEditorMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
@@ -49,6 +56,21 @@ export default function MonacoEditorComponent({
     if (project) {
       configureMonacoTypeScript(monaco, project);
     }
+
+    // Register VS Code-style HTML & JSX/TSX tag completion providers
+    registerHtmlJsxTagCompletion(monaco);
+
+    // Setup auto-close tag on typing `>`
+    if (autoCloseDisposableRef.current) {
+      autoCloseDisposableRef.current.dispose();
+    }
+    autoCloseDisposableRef.current = setupAutoCloseTagOnTyping(editor, monaco);
+
+    // Setup Tab expansion for Emmet abbreviations
+    if (emmetTabDisposableRef.current) {
+      emmetTabDisposableRef.current.dispose();
+    }
+    emmetTabDisposableRef.current = setupEmmetTabExpansion(editor, monaco);
 
     // Register Save command
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
@@ -62,7 +84,7 @@ export default function MonacoEditorComponent({
       }
     });
 
-    // Configure editor settings
+    // Configure editor settings matching VS Code experience
     editor.updateOptions({
       fontSize: settings.fontSize,
       wordWrap: settings.wordWrap,
@@ -72,10 +94,60 @@ export default function MonacoEditorComponent({
       cursorBlinking: "smooth",
       cursorSmoothCaretAnimation: "on",
       formatOnPaste: true,
+      formatOnType: true,
       renderWhitespace: "selection",
       scrollBeyondLastLine: false,
+      tabCompletion: "on",
+      snippetSuggestions: "top",
+      suggest: {
+        showSnippets: true,
+        snippetsPreventQuickSuggestions: false,
+      },
+      quickSuggestions: {
+        other: true,
+        comments: true,
+        strings: true,
+      },
+      acceptSuggestionOnEnter: "on",
+      suggestSelection: "first",
+      parameterHints: {
+        enabled: true,
+        cycle: true,
+      },
+      hover: {
+        delay: 300,
+      },
+      bracketPairColorization: {
+        enabled: true,
+      },
+      matchBrackets: "always",
+      autoClosingBrackets: "always",
+      autoClosingQuotes: "always",
+      autoClosingDelete: "always",
+      autoClosingOvertype: "always",
+      autoIndent: "full",
+      guides: {
+        bracketPairs: true,
+        indentation: true,
+      },
+      folding: true,
+      links: true,
     });
   };
+
+  // Cleanup disposables on unmount
+  useEffect(() => {
+    return () => {
+      if (autoCloseDisposableRef.current) {
+        autoCloseDisposableRef.current.dispose();
+        autoCloseDisposableRef.current = null;
+      }
+      if (emmetTabDisposableRef.current) {
+        emmetTabDisposableRef.current.dispose();
+        emmetTabDisposableRef.current = null;
+      }
+    };
+  }, []);
 
   // Update editor options whenever settings change
   useEffect(() => {
@@ -163,6 +235,48 @@ export default function MonacoEditorComponent({
           tabSize: settings.tabSize,
           lineNumbers: "on",
           padding: { top: 8, bottom: 8 },
+          smoothScrolling: true,
+          cursorBlinking: "smooth",
+          cursorSmoothCaretAnimation: "on",
+          formatOnPaste: true,
+          formatOnType: true,
+          renderWhitespace: "selection",
+          scrollBeyondLastLine: false,
+          tabCompletion: "on",
+          snippetSuggestions: "top",
+          suggest: {
+            showSnippets: true,
+            snippetsPreventQuickSuggestions: false,
+          },
+          quickSuggestions: {
+            other: true,
+            comments: true,
+            strings: true,
+          },
+          acceptSuggestionOnEnter: "on",
+          suggestSelection: "first",
+          parameterHints: {
+            enabled: true,
+            cycle: true,
+          },
+          hover: {
+            delay: 300,
+          },
+          bracketPairColorization: {
+            enabled: true,
+          },
+          matchBrackets: "always",
+          autoClosingBrackets: "always",
+          autoClosingQuotes: "always",
+          autoClosingDelete: "always",
+          autoClosingOvertype: "always",
+          autoIndent: "full",
+          guides: {
+            bracketPairs: true,
+            indentation: true,
+          },
+          folding: true,
+          links: true,
         }}
       />
     </div>

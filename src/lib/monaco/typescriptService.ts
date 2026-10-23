@@ -250,6 +250,11 @@ interface MonacoTypeScriptNamespace {
     setDiagnosticsOptions: (options: Record<string, unknown>) => void;
     addExtraLib: (content: string, filePath?: string) => Monaco.IDisposable;
   };
+  javascriptDefaults?: {
+    setCompilerOptions: (options: Record<string, unknown>) => void;
+    setDiagnosticsOptions: (options: Record<string, unknown>) => void;
+    addExtraLib: (content: string, filePath?: string) => Monaco.IDisposable;
+  };
   ScriptTarget?: { ES2022: number };
   ModuleResolutionKind?: { NodeJs: number };
   ModuleKind?: { ESNext: number };
@@ -265,6 +270,11 @@ export function configureMonacoTypeScript(monaco: typeof Monaco, project: Projec
   if (!ts?.typescriptDefaults) return;
 
   const tsDefaults = ts.typescriptDefaults;
+  const defaultsList = [ts.typescriptDefaults, ts.javascriptDefaults].filter(Boolean) as Array<{
+    setCompilerOptions: (options: Record<string, unknown>) => void;
+    setDiagnosticsOptions: (options: Record<string, unknown>) => void;
+    addExtraLib: (content: string, filePath?: string) => Monaco.IDisposable;
+  }>;
 
   // 1. Determine whether project uses a src/ directory
   const hasSrcDir = project.files.some(
@@ -299,8 +309,8 @@ export function configureMonacoTypeScript(monaco: typeof Monaco, project: Projec
     }
   }
 
-  // 3. Configure Monaco TypeScript Compiler Options
-  tsDefaults.setCompilerOptions({
+  // 3. Configure Monaco TypeScript & JavaScript Compiler Options
+  const compilerOptions = {
     target: ts.ScriptTarget?.ES2022 ?? 99,
     allowNonTextExtensions: true,
     moduleResolution: ts.ModuleResolutionKind?.NodeJs ?? 2,
@@ -316,24 +326,52 @@ export function configureMonacoTypeScript(monaco: typeof Monaco, project: Projec
     paths: tsconfigPaths,
     strict: true,
     skipLibCheck: false,
-  });
+  };
 
-  // 4. Configure Diagnostics (active semantic & syntax validation)
-  tsDefaults.setDiagnosticsOptions({
+  const diagnosticsOptions = {
     noSemanticValidation: false,
     noSyntaxValidation: false,
-  });
+  };
+
+  for (const defaults of defaultsList) {
+    defaults.setCompilerOptions(compilerOptions);
+    defaults.setDiagnosticsOptions(diagnosticsOptions);
+  }
+
+  // 4. Configure HTML & CSS defaults in Monaco
+  const htmlDefaults = (monaco.languages as unknown as { html?: { htmlDefaults?: { setOptions: (opts: unknown) => void } } })?.html?.htmlDefaults;
+  if (htmlDefaults?.setOptions) {
+    htmlDefaults.setOptions({
+      format: { tabSize: 2, insertSpaces: true },
+      suggest: { html5: true },
+    });
+  }
+
+  const cssDefaults = (monaco.languages as unknown as { css?: { cssDefaults?: { setOptions: (opts: unknown) => void } } })?.css?.cssDefaults;
+  if (cssDefaults?.setOptions) {
+    cssDefaults.setOptions({
+      validate: true,
+      lint: {
+        compatibleVendorPrefixes: "ignore",
+        vendorPrefix: "warning",
+        duplicateProperties: "warning",
+        emptyRules: "warning",
+      },
+    });
+  }
 
   // 5. Clean up existing extraLib disposables
   extraLibDisposables.forEach((d) => d.dispose());
   extraLibDisposables = [];
 
   // 6. Register ambient package definitions
-  const ambientDisposable = tsDefaults.addExtraLib(
-    AMBIENT_DECLARATIONS,
-    "file:///node_modules/@types/workspace-globals/index.d.ts"
-  );
-  extraLibDisposables.push(ambientDisposable);
+  for (const defaults of defaultsList) {
+    const ambientDisposable = defaults.addExtraLib(
+      AMBIENT_DECLARATIONS,
+      "file:///node_modules/@types/workspace-globals/index.d.ts"
+    );
+    extraLibDisposables.push(ambientDisposable);
+  }
 
   // 7. Register every workspace file into Monaco's language service as an extraLib and Monaco Model
   for (const file of project.files) {
