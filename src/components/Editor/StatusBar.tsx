@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { GitBranch, Check, Cloud, Loader2, AlertCircle } from "lucide-react";
+import { GitBranch, Check, Cloud, Loader2, AlertCircle, Terminal } from "lucide-react";
 import { ProjectFile } from "@/types/editor";
 
 interface StatusBarProps {
@@ -57,6 +57,21 @@ export default function StatusBar({
 
         <button
           type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={onToggleTerminal}
+          className={`flex items-center gap-1.5 px-2 py-0.5 rounded cursor-pointer transition font-medium ${
+            isTerminalOpen ? "bg-black/30 text-white font-semibold" : "hover:bg-black/15 text-white/90 hover:text-white"
+          }`}
+          title="Toggle Terminal"
+          aria-label="Toggle Terminal"
+        >
+          <Terminal className="w-3 h-3" />
+          <span>Terminal</span>
+        </button>
+
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
           onClick={onToggleTerminal}
           className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded cursor-pointer transition ${
             isTerminalOpen ? "bg-black/25 text-white" : "hover:bg-black/10 text-white/90"

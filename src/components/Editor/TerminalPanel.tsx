@@ -94,6 +94,17 @@ function TerminalPanel({
           if (prev && data.sessions.some((s) => s.id === prev)) return prev;
           return data.sessions[0].id;
         });
+      } else {
+        // If a terminal session does not exist, create one when the user first opens the terminal
+        try {
+          const createRes = await cloudApi.terminal.createSession(project.id);
+          if (createRes?.session) {
+            setSessions([createRes.session]);
+            setActiveSessionId(createRes.session.id);
+          }
+        } catch (createErr) {
+          console.warn("Failed to create initial terminal session:", createErr);
+        }
       }
     } catch (err) {
       console.warn("Failed to load terminal sessions:", err);
@@ -259,7 +270,11 @@ function TerminalPanel({
 
     let handle = sessionsMapRef.current.get(activeSessionId);
 
-    if (!handle) {
+    if (handle) {
+      if (masterContainerRef.current && !masterContainerRef.current.contains(handle.containerEl)) {
+        masterContainerRef.current.appendChild(handle.containerEl);
+      }
+    } else {
       // 1. Create container element
       const containerEl = document.createElement("div");
       containerEl.className = "w-full h-full";
@@ -350,6 +365,21 @@ function TerminalPanel({
       }
     });
   }, [isOpen, activeTab, activeSessionId, setupSessionConnection]);
+
+  // Re-fit active terminal whenever terminal panel is revealed
+  useEffect(() => {
+    if (isOpen && activeTab === "terminal" && activeSessionId) {
+      const handle = sessionsMapRef.current.get(activeSessionId);
+      if (handle) {
+        const timer = setTimeout(() => {
+          try {
+            handle.fitAddon.fit();
+          } catch {}
+        }, 30);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [isOpen, activeTab, activeSessionId]);
 
   // Handle Window Resize
   useEffect(() => {
@@ -513,15 +543,14 @@ function TerminalPanel({
     } catch {}
   };
 
-  if (!isOpen) return null;
-
   const activeSession = sessions.find((s) => s.id === activeSessionId);
   const currentHeight = isMaximized ? "85vh" : `${panelHeight}px`;
 
   return (
     <div
-      style={{ height: currentHeight }}
-      className="bg-[#181818] border-t border-[#2b2b2b] flex flex-col font-sans text-xs select-none shrink-0 z-20 relative transition-all duration-75"
+      data-testid="terminal-panel"
+      style={{ height: currentHeight, display: isOpen ? "flex" : "none" }}
+      className="bg-[#181818] border-t border-[#2b2b2b] flex-col font-sans text-xs select-none shrink-0 z-20 relative transition-all duration-75"
     >
       {/* Top Drag Handle for Resizing */}
       <div
@@ -746,6 +775,7 @@ function TerminalPanel({
           {/* Close Panel Button */}
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={onToggle}
             title="Hide panel"
             className="p-1 hover:text-white rounded hover:bg-[#333333] transition cursor-pointer"

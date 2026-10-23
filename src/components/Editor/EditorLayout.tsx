@@ -78,7 +78,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
 
   // 2. Views & Panels
   const [activeSidebarView, setActiveSidebarView] = useState<SidebarView | null>("explorer");
-  const [isTerminalOpen, setIsTerminalOpen] = useState(true);
+  const [isTerminalOpen, setIsTerminalOpen] = useState(false);
   const [terminalTab, setTerminalTab] = useState<BottomTab>("terminal");
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
@@ -104,6 +104,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
     setIsLoadingProject(true);
     setProjectLoadError(null);
     setIsPreviewOpen(false);
+    setIsTerminalOpen(false);
 
     async function loadWorkspaceProject() {
       try {
