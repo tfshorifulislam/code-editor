@@ -30,3 +30,4 @@ services:
       name: workspace_data
       mountPath: /app/workspaces
       sizeGB: 10
+
