@@ -129,11 +129,20 @@ export function createPtySession(
   const sessionName = customName || `${map.size + 1}: ${shellInfo.type}`;
 
   const isWindows = process.platform === "win32";
+  // Format short project name (e.g. proj_bb78b9e7d6918ae6 -> proj_bb78b9)
+  const shortProjName = projectId.length > 11 ? projectId.slice(0, 11) : projectId;
   let shellArgs: string[] = [];
 
   if (isWindows) {
     if (shellInfo.type === "powershell") {
-      shellArgs = ["-NoLogo"];
+      shellArgs = [
+        "-NoLogo",
+        "-NoExit",
+        "-Command",
+        `function prompt { $p = (Get-Location).Path; $ws = $env:WORKSPACE_ROOT; $proj = $env:PROJECT_DIR_NAME; if ($ws -and $p.StartsWith($ws, [System.StringComparison]::OrdinalIgnoreCase)) { $rel = $p.Substring($ws.Length).TrimStart('\\', '/'); if ($rel) { "PS ...\\$proj\\$rel> " } else { "PS ...\\$proj> " } } else { $leaf = Split-Path $p -Leaf; if ($leaf.Length -gt 13) { $leaf = $leaf.Substring(0, 11) }; "PS ...\\$leaf> " } }`,
+      ];
+    } else if (shellInfo.type === "cmd") {
+      shellArgs = ["/k", `prompt ...\\${shortProjName}$G`];
     } else if (shellInfo.type === "bash") {
       shellArgs = ["--login", "-i"];
     }
@@ -150,6 +159,10 @@ export function createPtySession(
     env: {
       ...process.env,
       PROJECT_ID: projectId,
+      WORKSPACE_ROOT: workspaceRoot,
+      PROJECT_DIR_NAME: shortProjName,
+      PROMPT: `...\\${shortProjName}$G`,
+      PS1: `.../${shortProjName}$ `,
       NODE_ENV: "development",
       TERM: "xterm-256color",
       COLORTERM: "truecolor",
