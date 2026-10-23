@@ -98,6 +98,8 @@ export interface Project {
 export interface EditorSettings {
   theme: "vs-dark" | "light";
   fontSize: number;
+  fontFamily?: string;
+  lineHeight?: number;
   wordWrap: "on" | "off";
   minimap: boolean;
   autoSave: boolean;

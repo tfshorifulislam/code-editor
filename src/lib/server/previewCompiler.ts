@@ -129,7 +129,7 @@ function renderErrorOverlay(error: {
             border-radius: 8px;
             padding: 14px;
             overflow-x: auto;
-            font-family: "JetBrains Mono", Consolas, monospace;
+            font-family: "Consolas", "Courier New", monospace;
             font-size: 13px;
             color: #f43f5e;
             white-space: pre-wrap;

@@ -994,6 +994,18 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
                     className="w-full"
                   />
                 </div>
+                <div className="space-y-1">
+                  <label className="text-neutral-300 block">Font Family</label>
+                  <div className="bg-[#1e1e1e] border border-[#3c3c3c] rounded p-2 text-neutral-300 font-mono text-[11px] select-text">
+                    Consolas, &quot;Courier New&quot;, monospace
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-neutral-300 block">Line Height</label>
+                  <div className="bg-[#1e1e1e] border border-[#3c3c3c] rounded p-2 text-neutral-300 font-mono text-[11px]">
+                    1.5 ({Math.round(settings.fontSize * 1.5)}px)
+                  </div>
+                </div>
               </div>
             )}
           </aside>

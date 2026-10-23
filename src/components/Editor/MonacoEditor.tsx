@@ -89,9 +89,17 @@ export default function MonacoEditorComponent({
       }
     });
 
+    const effectiveFontFamily = settings.fontFamily || '"Consolas", "Courier New", monospace';
+    const effectiveFontSize = settings.fontSize || 14;
+    const effectiveLineHeight = Math.round(effectiveFontSize * (settings.lineHeight || 1.5));
+
     // Configure editor settings matching VS Code experience
     editor.updateOptions({
-      fontSize: settings.fontSize,
+      fontFamily: effectiveFontFamily,
+      fontSize: effectiveFontSize,
+      lineHeight: effectiveLineHeight,
+      letterSpacing: 0,
+      fontLigatures: false,
       wordWrap: settings.wordWrap,
       minimap: { enabled: settings.minimap },
       tabSize: settings.tabSize,
@@ -161,8 +169,16 @@ export default function MonacoEditorComponent({
   // Update editor options whenever settings change
   useEffect(() => {
     if (editorRef.current) {
+      const effectiveFontFamily = settings.fontFamily || '"Consolas", "Courier New", monospace';
+      const effectiveFontSize = settings.fontSize || 14;
+      const effectiveLineHeight = Math.round(effectiveFontSize * (settings.lineHeight || 1.5));
+
       editorRef.current.updateOptions({
-        fontSize: settings.fontSize,
+        fontFamily: effectiveFontFamily,
+        fontSize: effectiveFontSize,
+        lineHeight: effectiveLineHeight,
+        letterSpacing: 0,
+        fontLigatures: false,
         wordWrap: settings.wordWrap,
         minimap: { enabled: settings.minimap },
         tabSize: settings.tabSize,
@@ -238,8 +254,11 @@ export default function MonacoEditorComponent({
         onMount={handleEditorMount}
         options={{
           automaticLayout: true,
-          fontFamily: "'JetBrains Mono', 'Fira Code', Menlo, Monaco, 'Courier New', monospace",
-          fontSize: settings.fontSize,
+          fontFamily: settings.fontFamily || '"Consolas", "Courier New", monospace',
+          fontSize: settings.fontSize || 14,
+          lineHeight: Math.round((settings.fontSize || 14) * (settings.lineHeight || 1.5)),
+          letterSpacing: 0,
+          fontLigatures: false,
           wordWrap: settings.wordWrap,
           minimap: { enabled: settings.minimap },
           tabSize: settings.tabSize,

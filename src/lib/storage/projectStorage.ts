@@ -3,6 +3,8 @@ import { Project, ProjectFile, ProjectTemplate, EditorSettings } from "@/types/e
 export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   theme: "vs-dark",
   fontSize: 14,
+  fontFamily: '"Consolas", "Courier New", monospace',
+  lineHeight: 1.5,
   wordWrap: "on",
   minimap: true,
   autoSave: true,
@@ -955,7 +957,14 @@ export function loadEditorSettings(): EditorSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_SETTINGS);
     if (!raw) return DEFAULT_EDITOR_SETTINGS;
-    return { ...DEFAULT_EDITOR_SETTINGS, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw);
+    return {
+      ...DEFAULT_EDITOR_SETTINGS,
+      ...parsed,
+      fontSize: typeof parsed.fontSize === "number" && parsed.fontSize > 0 ? parsed.fontSize : 14,
+      fontFamily: parsed.fontFamily || DEFAULT_EDITOR_SETTINGS.fontFamily,
+      lineHeight: typeof parsed.lineHeight === "number" && parsed.lineHeight > 0 ? parsed.lineHeight : 1.5,
+    };
   } catch {
     return DEFAULT_EDITOR_SETTINGS;
   }
