@@ -69,13 +69,62 @@ declare module "react" {
   export type FC<P = {}> = (props: P) => ReactElement | null;
   export type ComponentProps<T> = any;
 
+  export type DetailedHTMLProps<E, T> = E & { ref?: any };
+  export type RefAttributes<T> = { ref?: any };
+  export type Ref<T> = any;
+  export type RefObject<T> = { readonly current: T | null };
+  export type MutableRefObject<T> = { current: T };
+
+  export type ForwardRefExoticComponent<P> = {
+    (props: P): ReactElement | null;
+    displayName?: string;
+    defaultProps?: Partial<P>;
+    propTypes?: any;
+  };
+
+  export type CSSProperties = { [key: string]: any };
+
   export interface HTMLAttributes<T> {
     className?: string;
-    style?: any;
+    style?: CSSProperties;
     children?: ReactNode;
     id?: string;
+    title?: string;
+    tabIndex?: number;
+    role?: string;
+    ariaLabel?: string;
     onClick?: (e: any) => void;
+    onKeyDown?: (e: any) => void;
+    onKeyUp?: (e: any) => void;
+    onChange?: (e: any) => void;
+    onSubmit?: (e: any) => void;
+    onMouseEnter?: (e: any) => void;
+    onMouseLeave?: (e: any) => void;
     [key: string]: any;
+  }
+
+  export interface ImgHTMLAttributes<T> extends HTMLAttributes<T> {
+    alt?: string;
+    crossOrigin?: "anonymous" | "use-credentials" | "";
+    decoding?: "async" | "auto" | "sync";
+    height?: number | string;
+    loading?: "eager" | "lazy";
+    referrerPolicy?: string;
+    sizes?: string;
+    src?: string;
+    srcSet?: string;
+    useMap?: string;
+    width?: number | string;
+    onLoad?: (e: any) => void;
+    onError?: (e: any) => void;
+  }
+
+  export interface AnchorHTMLAttributes<T> extends HTMLAttributes<T> {
+    href?: string;
+    target?: string;
+    rel?: string;
+    download?: any;
+    as?: string;
   }
 
   export interface ButtonHTMLAttributes<T> extends HTMLAttributes<T> {
@@ -84,6 +133,37 @@ declare module "react" {
     onClick?: (e: any) => void;
     name?: string;
     value?: string | number | readonly string[];
+  }
+
+  export interface InputHTMLAttributes<T> extends HTMLAttributes<T> {
+    type?: string;
+    value?: string | number | readonly string[];
+    defaultValue?: string | number | readonly string[];
+    placeholder?: string;
+    disabled?: boolean;
+    readOnly?: boolean;
+    required?: boolean;
+    onChange?: (e: any) => void;
+    onFocus?: (e: any) => void;
+    onBlur?: (e: any) => void;
+    name?: string;
+    checked?: boolean;
+    min?: number | string;
+    max?: number | string;
+    step?: number | string;
+  }
+
+  export interface SVGProps<T> extends HTMLAttributes<T> {
+    width?: number | string;
+    height?: number | string;
+    viewBox?: string;
+    fill?: string;
+    stroke?: string;
+    strokeWidth?: number | string;
+    strokeLinecap?: string;
+    strokeLinejoin?: string;
+    xmlns?: string;
+    [key: string]: any;
   }
 
   export function forwardRef<T, P = {}>(
@@ -97,6 +177,7 @@ declare module "react" {
   export function useRef<T>(initialValue?: T): { current: T };
   export function createContext<T>(defaultValue: T): any;
   export function useContext<T>(context: any): T;
+  export function useId(): string;
   export const Fragment: any;
   export default React;
 }
@@ -111,6 +192,24 @@ declare module "react-dom/client" {
 
 // --- Next.js Framework & App Router ---
 declare module "next" {
+  export interface NextConfig {
+    reactStrictMode?: boolean;
+    experimental?: Record<string, any>;
+    images?: Record<string, any>;
+    turbopack?: Record<string, any>;
+    webpack?: (config: any, context: any) => any;
+    env?: Record<string, string>;
+    pageExtensions?: string[];
+    transpilePackages?: string[];
+    output?: "standalone" | "export";
+    distDir?: string;
+    basePath?: string;
+    assetPrefix?: string;
+    headers?: () => Promise<any[]>;
+    rewrites?: () => Promise<any>;
+    redirects?: () => Promise<any[]>;
+    [key: string]: any;
+  }
   export interface Metadata {
     title?: string | { default: string; template?: string; absolute?: string };
     description?: string;
@@ -125,7 +224,85 @@ declare module "next" {
     [key: string]: any;
   }
   export type NextPage<P = {}, IP = P> = (props: P) => any;
+  const Next: any;
   export default Next;
+}
+
+declare module "next/image" {
+  import * as React from "react";
+
+  export type ImageLoader = (p: ImageLoaderProps) => string;
+
+  export interface ImageLoaderProps {
+    src: string;
+    width: number;
+    quality?: number;
+  }
+
+  export type LoadingValue = "lazy" | "eager" | undefined;
+  export type PlaceholderValue = "blur" | "empty";
+  export type OnLoadingComplete = (img: HTMLImageElement) => void;
+
+  export interface StaticImageData {
+    src: string;
+    height: number;
+    width: number;
+    blurDataURL?: string;
+    blurWidth?: number;
+    blurHeight?: number;
+  }
+
+  export interface StaticRequire {
+    default: StaticImageData;
+  }
+
+  export type StaticImport = StaticRequire | StaticImageData;
+
+  export interface ImageProps {
+    src: string | StaticImport;
+    alt: string;
+    width?: number | string;
+    height?: number | string;
+    fill?: boolean;
+    loader?: ImageLoader;
+    quality?: number | string;
+    priority?: boolean;
+    preload?: boolean;
+    loading?: LoadingValue;
+    placeholder?: PlaceholderValue;
+    blurDataURL?: string;
+    unoptimized?: boolean;
+    overrideSrc?: string;
+    onLoadingComplete?: OnLoadingComplete;
+    layout?: string;
+    objectFit?: string;
+    objectPosition?: string;
+    lazyBoundary?: string;
+    lazyRoot?: string;
+    sizes?: string;
+    className?: string;
+    style?: React.CSSProperties | Record<string, any>;
+    id?: string;
+    tabIndex?: number;
+    title?: string;
+    role?: string;
+    ariaLabel?: string;
+    crossOrigin?: "anonymous" | "use-credentials" | "";
+    decoding?: "async" | "auto" | "sync";
+    referrerPolicy?: string;
+    onClick?: (e: any) => void;
+    onLoad?: (e: any) => void;
+    onError?: (e: any) => void;
+    [key: string]: any;
+  }
+
+  export function getImageProps(props: ImageProps): { props: Record<string, any> };
+
+  const Image: React.ForwardRefExoticComponent<
+    ImageProps & React.RefAttributes<HTMLImageElement>
+  >;
+
+  export default Image;
 }
 
 declare module "next/link" {
@@ -157,6 +334,163 @@ declare module "next/navigation" {
   export function useParams<T = Record<string, string | string[]>>(): T;
   export function redirect(url: string): never;
   export function notFound(): never;
+}
+
+declare module "next/font/google" {
+  export interface NextFont {
+    className: string;
+    style: { fontFamily: string; fontWeight?: number | string; fontStyle?: string };
+    variable?: string;
+  }
+  export interface FontOptions {
+    weight?: string | string[];
+    style?: string | string[];
+    subsets?: string[];
+    display?: string;
+    preload?: boolean;
+    fallback?: string[];
+    adjustFontFallback?: boolean;
+    variable?: string;
+    axes?: string[];
+  }
+  export type FontLoader = (options?: FontOptions) => NextFont;
+
+  export const Geist: FontLoader;
+  export const Geist_Mono: FontLoader;
+  export const Inter: FontLoader;
+  export const Roboto: FontLoader;
+  export const Roboto_Mono: FontLoader;
+  export const Open_Sans: FontLoader;
+  export const Montserrat: FontLoader;
+  export const Poppins: FontLoader;
+  export const Lato: FontLoader;
+  export const Oswald: FontLoader;
+  export const Raleway: FontLoader;
+  export const Fira_Code: FontLoader;
+  export const JetBrains_Mono: FontLoader;
+  export const Plus_Jakarta_Sans: FontLoader;
+
+  const defaultFont: FontLoader;
+  export default defaultFont;
+}
+
+declare module "next/font/local" {
+  export interface LocalFontOptions {
+    src: string | Array<{ path: string; weight?: string; style?: string }>;
+    display?: string;
+    weight?: string;
+    style?: string;
+    fallback?: string[];
+    preload?: boolean;
+    variable?: string;
+    declarations?: Array<{ prop: string; value: string }>;
+  }
+  export default function localFont(options: LocalFontOptions): {
+    className: string;
+    style: { fontFamily: string; fontWeight?: number | string; fontStyle?: string };
+    variable?: string;
+  };
+}
+
+declare module "next/server" {
+  export class NextRequest extends Request {
+    readonly nextUrl: URL;
+    readonly cookies: any;
+    readonly ip?: string;
+    readonly geo?: any;
+  }
+  export class NextResponse extends Response {
+    static json(body: any, init?: ResponseInit): NextResponse;
+    static redirect(url: string | URL, status?: number): NextResponse;
+    static rewrite(url: string | URL): NextResponse;
+    static next(init?: ResponseInit): NextResponse;
+    readonly cookies: any;
+  }
+}
+
+declare module "next/headers" {
+  export function cookies(): Promise<any> | any;
+  export function headers(): Promise<Headers> | Headers;
+  export function draftMode(): Promise<any> | any;
+}
+
+declare module "next/dynamic" {
+  import * as React from "react";
+  export type DynamicOptions<P = {}> = {
+    loading?: (props: { error?: Error | null; isLoading?: boolean; pastDelay?: boolean; retry?: () => void }) => React.ReactElement | null;
+    ssr?: boolean;
+    suspense?: boolean;
+  };
+  export default function dynamic<P = {}>(
+    dynamicOptions: () => Promise<React.ComponentType<P> | { default: React.ComponentType<P> }>,
+    options?: DynamicOptions<P>
+  ): React.ComponentType<P>;
+}
+
+declare module "next/head" {
+  import * as React from "react";
+  export default function Head({ children }: { children: React.ReactNode }): React.ReactElement;
+}
+
+// --- Next.js App Router Global Page & Layout Types ---
+interface LayoutProps<T = any> {
+  children?: any;
+  params?: Promise<Record<string, string | string[]>>;
+  [key: string]: any;
+}
+
+interface PageProps<T = any> {
+  params?: Promise<Record<string, string | string[]>>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+  [key: string]: any;
+}
+
+// --- Next.js Image Types & Asset Modules ---
+declare module "next/image-types/global" {}
+
+declare module "*.png" {
+  import { StaticImageData } from "next/image";
+  const content: StaticImageData;
+  export default content;
+}
+declare module "*.svg" {
+  const content: any;
+  export default content;
+}
+declare module "*.jpg" {
+  import { StaticImageData } from "next/image";
+  const content: StaticImageData;
+  export default content;
+}
+declare module "*.jpeg" {
+  import { StaticImageData } from "next/image";
+  const content: StaticImageData;
+  export default content;
+}
+declare module "*.gif" {
+  import { StaticImageData } from "next/image";
+  const content: StaticImageData;
+  export default content;
+}
+declare module "*.webp" {
+  import { StaticImageData } from "next/image";
+  const content: StaticImageData;
+  export default content;
+}
+declare module "*.avif" {
+  import { StaticImageData } from "next/image";
+  const content: StaticImageData;
+  export default content;
+}
+declare module "*.ico" {
+  import { StaticImageData } from "next/image";
+  const content: StaticImageData;
+  export default content;
+}
+declare module "*.bmp" {
+  import { StaticImageData } from "next/image";
+  const content: StaticImageData;
+  export default content;
 }
 
 // --- lucide-react ---
@@ -286,16 +620,32 @@ export function configureMonacoTypeScript(monaco: typeof Monaco, project: Projec
     ? { "@/*": ["file:///src/*", "file:///*"] }
     : { "@/*": ["file:///*", "file:///src/*"] };
 
+  let skipLibCheck = true;
+  let strict = true;
+  let allowJs = true;
+
   const tsconfigFile = project.files.find((f) => f.path === "tsconfig.json");
   if (tsconfigFile) {
     try {
       const parsed = JSON.parse(tsconfigFile.content);
-      if (parsed.compilerOptions?.paths) {
+      const opts = parsed.compilerOptions || {};
+
+      if (opts.skipLibCheck !== undefined) {
+        skipLibCheck = Boolean(opts.skipLibCheck);
+      }
+      if (opts.strict !== undefined) {
+        strict = Boolean(opts.strict);
+      }
+      if (opts.allowJs !== undefined) {
+        allowJs = Boolean(opts.allowJs);
+      }
+
+      if (opts.paths) {
         const resolved: Record<string, string[]> = {};
-        for (const [key, paths] of Object.entries(parsed.compilerOptions.paths)) {
+        for (const [key, paths] of Object.entries(opts.paths)) {
           if (Array.isArray(paths)) {
             resolved[key] = paths.map((p: string) => {
-              const cleaned = p.replace(/^\.\//, "");
+              const cleaned = p.replace(/^\.\//, "").replace(/^\//, "");
               return `file:///${cleaned}`;
             });
           }
@@ -320,12 +670,12 @@ export function configureMonacoTypeScript(monaco: typeof Monaco, project: Projec
     allowSyntheticDefaultImports: true,
     jsx: ts.JsxEmit?.ReactJSX ?? 4,
     reactNamespace: "React",
-    allowJs: true,
+    allowJs,
     resolveJsonModule: true,
     baseUrl: "file:///",
     paths: tsconfigPaths,
-    strict: true,
-    skipLibCheck: false,
+    strict,
+    skipLibCheck,
   };
 
   const diagnosticsOptions = {
@@ -356,6 +706,7 @@ export function configureMonacoTypeScript(monaco: typeof Monaco, project: Projec
         vendorPrefix: "warning",
         duplicateProperties: "warning",
         emptyRules: "warning",
+        unknownAtRules: "ignore",
       },
     });
   }
@@ -371,6 +722,18 @@ export function configureMonacoTypeScript(monaco: typeof Monaco, project: Projec
       "file:///node_modules/@types/workspace-globals/index.d.ts"
     );
     extraLibDisposables.push(ambientDisposable);
+
+    const nextImageDisposable = defaults.addExtraLib(
+      AMBIENT_DECLARATIONS,
+      "file:///node_modules/next/image.d.ts"
+    );
+    extraLibDisposables.push(nextImageDisposable);
+
+    const nextGlobalDisposable = defaults.addExtraLib(
+      AMBIENT_DECLARATIONS,
+      "file:///node_modules/next/image-types/global.d.ts"
+    );
+    extraLibDisposables.push(nextGlobalDisposable);
   }
 
   // 7. Register every workspace file into Monaco's language service as an extraLib and Monaco Model

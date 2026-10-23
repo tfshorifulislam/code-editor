@@ -80,7 +80,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
   const [activeSidebarView, setActiveSidebarView] = useState<SidebarView | null>("explorer");
   const [isTerminalOpen, setIsTerminalOpen] = useState(true);
   const [terminalTab, setTerminalTab] = useState<BottomTab>("terminal");
-  const [isPreviewOpen, setIsPreviewOpen] = useState(true);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
   const [isAIOpen, setIsAIOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -103,6 +103,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
     let isCancelled = false;
     setIsLoadingProject(true);
     setProjectLoadError(null);
+    setIsPreviewOpen(false);
 
     async function loadWorkspaceProject() {
       try {
@@ -1096,7 +1097,7 @@ export default function EditorLayout({ initialProjectId }: EditorLayoutProps) {
         </main>
 
         {/* Right Side: Live Web Preview Panel */}
-        {isPreviewOpen && (
+        {isPreviewOpen && activeProject && (
           <div className="w-1/2 lg:w-[45%] flex shrink-0 border-l border-[#2b2b2b]">
             <PreviewPanel
               project={activeProject}

@@ -47,41 +47,8 @@ export default function PreviewPanel({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
-  // Query server status when project changes
-  useEffect(() => {
-    if (!project.id) return;
-    let isCancelled = false;
-
-    async function loadStatus() {
-      try {
-        const res = await cloudApi.server.getStatus(project.id);
-        if (!isCancelled) {
-          setServerStatus(res.status);
-          setServerPort(res.port);
-          setServerUrl(res.url);
-          setServerLogs(res.logs || []);
-          setServerError(res.error);
-        }
-      } catch {
-        // Fallback
-      }
-    }
-
-    loadStatus();
-    return () => {
-      isCancelled = true;
-    };
-  }, [project.id]);
-
-  // Auto-scroll logs when starting
-  useEffect(() => {
-    if (serverStatus === "starting") {
-      logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [serverLogs, serverStatus]);
-
   // Start dev server action
-  const handleStartServer = async () => {
+  const handleStartServer = React.useCallback(async () => {
     setIsActionLoading(true);
     setServerStatus("starting");
     try {
@@ -97,25 +64,26 @@ export default function PreviewPanel({
     } finally {
       setIsActionLoading(false);
     }
-  };
+  }, [project.id]);
 
-  // Stop dev server action
-  const handleStopServer = async () => {
+  // Stop dev server action: stops process and closes/hides the preview window
+  const handleStopServer = React.useCallback(async () => {
     setIsActionLoading(true);
     try {
       await cloudApi.server.stop(project.id);
       setServerStatus("stopped");
       setServerPort(undefined);
       setServerUrl(undefined);
+      onClose();
     } catch (err) {
       console.error("Stop dev server error:", err);
     } finally {
       setIsActionLoading(false);
     }
-  };
+  }, [project.id, onClose]);
 
   // Restart dev server action
-  const handleRestartServer = async () => {
+  const handleRestartServer = React.useCallback(async () => {
     setIsActionLoading(true);
     setServerStatus("starting");
     try {
@@ -132,7 +100,53 @@ export default function PreviewPanel({
     } finally {
       setIsActionLoading(false);
     }
-  };
+  }, [project.id]);
+
+  // Query server status and automatically start or refresh dev server preview on Run Preview
+  useEffect(() => {
+    if (!project.id || !isOpen) return;
+    let isCancelled = false;
+
+    async function loadStatusAndRun() {
+      if (previewMode === "compiler") {
+        setRefreshKey((k) => k + 1);
+        return;
+      }
+
+      try {
+        const res = await cloudApi.server.getStatus(project.id);
+        if (isCancelled) return;
+
+        setServerStatus(res.status);
+        setServerPort(res.port);
+        setServerUrl(res.url);
+        setServerLogs(res.logs || []);
+        setServerError(res.error);
+
+        // If server is running, refresh the preview
+        if (res.status === "running") {
+          setRefreshKey((k) => k + 1);
+        } else if (res.status === "stopped") {
+          // If server is stopped, start it automatically so clicking Run Preview actually runs the preview
+          handleStartServer();
+        }
+      } catch {
+        // Fallback
+      }
+    }
+
+    loadStatusAndRun();
+    return () => {
+      isCancelled = true;
+    };
+  }, [project.id, isOpen, refreshTrigger, previewMode, handleStartServer]);
+
+  // Auto-scroll logs when starting
+  useEffect(() => {
+    if (serverStatus === "starting") {
+      logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [serverLogs, serverStatus]);
 
   // Listen for console bridge messages from the iframe
   useEffect(() => {
