@@ -46,18 +46,18 @@ export async function createCloudProject(
     if (p.name) projectName = p.name.trim();
     if (p.description) projectDesc = p.description;
 
-    if (p.type === "blank") {
+    if (p.type === "blank" || p.template === "blank") {
       template = "blank";
-      if (p.blankSubtype === "empty") {
-        const res = generateEmptyWorkspaceFiles();
-        templateFiles = res.files;
-        activeFileId = null;
-        openFileIds = [];
-      } else {
+      if (p.blankSubtype === "basic-web") {
         const res = generateBasicWebFiles(p.initGit);
         templateFiles = res.files;
         activeFileId = res.activeFileId;
         openFileIds = res.openFileIds;
+      } else {
+        const res = generateEmptyWorkspaceFiles();
+        templateFiles = res.files;
+        activeFileId = null;
+        openFileIds = [];
       }
     } else {
       template = p.template || "next-app";
@@ -97,7 +97,7 @@ export async function createCloudProject(
     cpp: "C++20 High Performance App",
     go: "Go Cloud Microservice",
     rust: "Rust Systems Project",
-    blank: "Blank Project Scratchpad",
+    blank: "Empty Project",
   };
 
   const finalProjectName = projectName || defaultNames[template] || "New Project";

@@ -15,6 +15,8 @@ import {
   ArrowLeft,
   LogOut,
   Cloud,
+  FilePlus,
+  Loader2,
 } from "lucide-react";
 import { useAuth } from "@/components/Auth/AuthContext";
 
@@ -29,6 +31,8 @@ interface ProjectsSidebarProps {
   currentCategory: DashboardViewCategory;
   onSelectCategory: (category: DashboardViewCategory) => void;
   onOpenNewProject: () => void;
+  onCreateEmptyProject?: () => void;
+  isCreatingEmpty?: boolean;
   counts: {
     all: number;
     recent: number;
@@ -41,6 +45,8 @@ export default function ProjectsSidebar({
   currentCategory,
   onSelectCategory,
   onOpenNewProject,
+  onCreateEmptyProject,
+  isCreatingEmpty = false,
   counts,
 }: ProjectsSidebarProps) {
   const { user, logout } = useAuth();
@@ -107,15 +113,33 @@ export default function ProjectsSidebar({
           </Link>
         </div>
 
-        {/* Primary "+ New Project" Button */}
-        <button
-          type="button"
-          onClick={onOpenNewProject}
-          className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white text-sm font-semibold shadow-sm hover:shadow transition-all cursor-pointer group"
-        >
-          <Plus className="w-4 h-4 transition-transform group-hover:rotate-90" />
-          <span>New Project</span>
-        </button>
+        {/* Primary Project Creation Action Buttons */}
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={onOpenNewProject}
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white text-sm font-semibold shadow-sm hover:shadow transition-all cursor-pointer group"
+          >
+            <Plus className="w-4 h-4 transition-transform group-hover:rotate-90" />
+            <span>New Project</span>
+          </button>
+
+          {onCreateEmptyProject && (
+            <button
+              type="button"
+              onClick={onCreateEmptyProject}
+              disabled={isCreatingEmpty}
+              className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl border border-[#e5e5e7] hover:border-[var(--color-primary)] bg-white hover:bg-neutral-50 text-neutral-800 hover:text-[var(--color-primary)] text-xs sm:text-sm font-semibold shadow-2xs transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isCreatingEmpty ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--color-primary)]" />
+              ) : (
+                <FilePlus className="w-3.5 h-3.5 text-[var(--color-primary)]" />
+              )}
+              <span>Empty Project</span>
+            </button>
+          )}
+        </div>
 
         {/* Navigation Categories */}
         <nav className="space-y-1 pt-2">

@@ -1,13 +1,15 @@
 "use client";
 
 import React from "react";
-import { FolderCode, Star, Trash2, Search, Plus } from "lucide-react";
+import { FolderCode, Star, Trash2, Search, Plus, FilePlus, Loader2 } from "lucide-react";
 import { DashboardViewCategory } from "./ProjectsSidebar";
 
 interface ProjectEmptyStateProps {
   category: DashboardViewCategory;
   isSearchActive: boolean;
   onOpenNewProject: () => void;
+  onCreateEmptyProject?: () => void;
+  isCreatingEmpty?: boolean;
   onClearSearch?: () => void;
 }
 
@@ -15,6 +17,8 @@ export default function ProjectEmptyState({
   category,
   isSearchActive,
   onOpenNewProject,
+  onCreateEmptyProject,
+  isCreatingEmpty = false,
   onClearSearch,
 }: ProjectEmptyStateProps) {
   if (isSearchActive) {
@@ -77,14 +81,31 @@ export default function ProjectEmptyState({
       <p className="text-xs text-neutral-500 max-w-sm mt-1.5 leading-relaxed">
         Get started with React + TypeScript, Vanilla Web, Next.js, or a blank workspace with live preview and AI assistance.
       </p>
-      <button
-        type="button"
-        onClick={onOpenNewProject}
-        className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white text-xs font-bold shadow-xs hover:shadow transition cursor-pointer"
-      >
-        <Plus className="w-4 h-4" />
-        <span>Create Project</span>
-      </button>
+      <div className="flex items-center gap-2.5 mt-5 flex-wrap justify-center">
+        {onCreateEmptyProject && (
+          <button
+            type="button"
+            onClick={onCreateEmptyProject}
+            disabled={isCreatingEmpty}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#d1d1d6] hover:border-[var(--color-primary)] bg-white hover:bg-neutral-50 text-neutral-800 hover:text-[var(--color-primary)] text-xs font-semibold shadow-2xs transition cursor-pointer disabled:opacity-60"
+          >
+            {isCreatingEmpty ? (
+              <Loader2 className="w-4 h-4 animate-spin text-[var(--color-primary)]" />
+            ) : (
+              <FilePlus className="w-4 h-4 text-[var(--color-primary)]" />
+            )}
+            <span>Empty Project</span>
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onOpenNewProject}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white text-xs font-bold shadow-xs hover:shadow transition cursor-pointer"
+        >
+          <Plus className="w-4 h-4" />
+          <span>New Project</span>
+        </button>
+      </div>
     </div>
   );
 }

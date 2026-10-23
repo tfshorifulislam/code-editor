@@ -9,6 +9,8 @@ import {
   Upload,
   SlidersHorizontal,
   X,
+  FilePlus,
+  Loader2,
 } from "lucide-react";
 import { DashboardViewCategory } from "./ProjectsSidebar";
 
@@ -23,6 +25,8 @@ interface ProjectsHeaderProps {
   sortBy: "modified" | "name" | "created";
   onSortChange: (sort: "modified" | "name" | "created") => void;
   onOpenNewProject: () => void;
+  onCreateEmptyProject?: () => void;
+  isCreatingEmpty?: boolean;
   onOpenImportProject?: () => void;
 }
 
@@ -37,6 +41,8 @@ export default function ProjectsHeader({
   sortBy,
   onSortChange,
   onOpenNewProject,
+  onCreateEmptyProject,
+  isCreatingEmpty = false,
   onOpenImportProject,
 }: ProjectsHeaderProps) {
   const getCategoryTitle = () => {
@@ -84,7 +90,7 @@ export default function ProjectsHeader({
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 self-start sm:self-auto shrink-0">
+        <div className="flex items-center gap-2.5 self-start sm:self-auto shrink-0 flex-wrap">
           {onOpenImportProject && (
             <button
               type="button"
@@ -93,6 +99,21 @@ export default function ProjectsHeader({
             >
               <Upload className="w-4 h-4 text-[var(--color-primary)]" />
               <span>Import Project</span>
+            </button>
+          )}
+          {onCreateEmptyProject && (
+            <button
+              type="button"
+              onClick={onCreateEmptyProject}
+              disabled={isCreatingEmpty}
+              className="inline-flex items-center justify-center gap-2 py-2 px-3.5 rounded-xl border border-[#d1d1d6] hover:border-[var(--color-primary)] bg-white hover:bg-neutral-50 text-neutral-800 hover:text-[var(--color-primary)] text-xs sm:text-sm font-semibold shadow-2xs transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isCreatingEmpty ? (
+                <Loader2 className="w-4 h-4 animate-spin text-[var(--color-primary)]" />
+              ) : (
+                <FilePlus className="w-4 h-4 text-[var(--color-primary)]" />
+              )}
+              <span>Empty Project</span>
             </button>
           )}
           <button

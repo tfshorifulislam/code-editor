@@ -250,6 +250,26 @@ export default function ProjectsDashboard() {
     }
   };
 
+  const [isCreatingEmpty, setIsCreatingEmpty] = useState(false);
+
+  const handleCreateEmptyProject = async () => {
+    if (isCreatingEmpty) return;
+    try {
+      setIsCreatingEmpty(true);
+      const emptyProj = await cloudApi.projects.create({
+        type: "blank",
+        blankSubtype: "empty",
+        name: "Empty Project",
+        description: "Empty workspace ready for custom files",
+      });
+      router.push(`/editor/${emptyProj.id}`);
+    } catch (err) {
+      console.error("Create empty project error:", err);
+      alert("Failed to create empty project in cloud.");
+      setIsCreatingEmpty(false);
+    }
+  };
+
   const handleCreateFromTemplate = async (template: ProjectTemplate) => {
     try {
       setIsLoading(true);
@@ -323,6 +343,8 @@ export default function ProjectsDashboard() {
         currentCategory={currentCategory}
         onSelectCategory={setCurrentCategory}
         onOpenNewProject={() => setIsNewProjectOpen(true)}
+        onCreateEmptyProject={handleCreateEmptyProject}
+        isCreatingEmpty={isCreatingEmpty}
         counts={counts}
       />
 
@@ -340,6 +362,8 @@ export default function ProjectsDashboard() {
           sortBy={sortBy}
           onSortChange={setSortBy}
           onOpenNewProject={() => setIsNewProjectOpen(true)}
+          onCreateEmptyProject={handleCreateEmptyProject}
+          isCreatingEmpty={isCreatingEmpty}
           onOpenImportProject={() => setIsImportProjectOpen(true)}
         />
 
@@ -439,6 +463,8 @@ export default function ProjectsDashboard() {
               category={currentCategory}
               isSearchActive={Boolean(searchQuery.trim())}
               onOpenNewProject={() => setIsNewProjectOpen(true)}
+              onCreateEmptyProject={handleCreateEmptyProject}
+              isCreatingEmpty={isCreatingEmpty}
               onClearSearch={() => setSearchQuery("")}
             />
           )}
